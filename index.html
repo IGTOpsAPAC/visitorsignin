@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_7.html -->
+<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_8.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -110,6 +110,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
 .import-drop:active{background:var(--bg2)}
 .emp-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--br)}
 .emp-row:last-child{border-bottom:none}
+.rv-result-row:hover{background:var(--bg2) !important;border-color:var(--blue) !important}
+.rv-result-row:active{transform:scale(0.98)}
 .emp-av{width:32px;height:32px;border-radius:50%;background:#DDEEFF;color:#003A96;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
 
 /* Field toggles */
@@ -150,8 +152,46 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
   </div>
   <div class="scroll" id="si-scroll">
 
-    <!-- Step 1: Details -->
-    <div id="si-s1">
+    <!-- Step 0: Returning visitor check -->
+    <div id="si-s0">
+      <div class="card" style="text-align:center;padding:28px 20px">
+        <div style="font-size:40px;margin-bottom:14px">👋</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px">Have you visited before?</div>
+        <div style="font-size:14px;color:var(--tx3);margin-bottom:28px">We can pre-fill your details to save time.</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <button class="btn-full" id="si-returning">Yes, search my details</button>
+          <button class="btn-full" id="si-new" style="background:var(--bg2);color:var(--tx);border:1.5px solid var(--br2)">No, I am a new visitor</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 0b: Returning visitor search -->
+    <div id="si-s0b" style="display:none">
+      <div class="steps"><div class="step active"></div><div class="step"></div><div class="step"></div></div>
+      <div class="card">
+        <div class="card-title">Find your record</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:12px">Enter your name or email to search previous visits.</p>
+        <div class="field">
+          <label>Name or email</label>
+          <input id="rv-search" type="text" placeholder="e.g. Jane Smith or jane@company.com" autocomplete="off">
+        </div>
+        <button class="btn-full" id="rv-lookup">Search</button>
+        <div id="rv-results" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- Step 0c: Confirm returning visitor details -->
+    <div id="si-s0c" style="display:none">
+      <div class="steps"><div class="step done"></div><div class="step active"></div><div class="step"></div></div>
+      <div class="card">
+        <div class="card-title">Confirm your details</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Please review and update if anything has changed.</p>
+        <div id="rv-confirm-fields"></div>
+      </div>
+    </div>
+
+    <!-- Step 1: Details (new visitor) -->
+    <div id="si-s1" style="display:none">
       <div class="steps"><div class="step active"></div><div class="step"></div></div>
       <div class="card" id="si-form-card">
         <div class="card-title">Your details</div>
@@ -428,78 +468,268 @@ function buildFieldHtml(f) {
 
 /* ── Sign-in flow ──────────────────────────────────────── */
 var siStep = 1;
+var rvMode = false;   // true = returning visitor path
+var rvVisitor = null; // the matched previous visitor record
 
-function showSiStep(n) {
-  [1,2,3].forEach(function(i) {
-    var el = document.getElementById('si-s' + i);
-    if (el) el.style.display = (i === n) ? 'block' : 'none';
+// All possible step screens
+var ALL_STEPS = ['si-s0','si-s0b','si-s0c','si-s1','si-s2','si-s3'];
+
+function hideAllSteps() {
+  ALL_STEPS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
   });
+}
+
+function showStep(id) {
+  hideAllSteps();
+  var el = document.getElementById(id);
+  if (el) el.style.display = 'block';
+  document.getElementById('si-scroll').scrollTo(0, 0);
+}
+
+// Legacy numeric step for agreement/success (step 2 & 3)
+function showSiStep(n) {
   siStep = n;
   var bar  = document.getElementById('si-bar');
   var next = document.getElementById('si-next');
   var prev = document.getElementById('si-prev');
-  if (n === 3) { bar.style.display = 'none'; return; }
+
+  if (n === 3) {
+    showStep('si-s3');
+    bar.style.display = 'none';
+    return;
+  }
+  if (n === 2) {
+    showStep('si-s2');
+    bar.style.display = 'flex';
+    prev.style.display = '';
+    next.textContent = 'Complete Sign-In';
+    next.className = 'btn-main green';
+    return;
+  }
+  // n === 1 = new visitor details
+  showStep('si-s1');
   bar.style.display = 'flex';
-  prev.style.display = n > 1 ? '' : 'none';
-  next.textContent = n === 2 ? 'Complete Sign-In' : 'Continue';
-  next.className = 'btn-main' + (n === 2 ? ' green' : '');
-  document.getElementById('si-scroll').scrollTo(0, 0);
+  prev.style.display = rvMode ? '' : 'none';
+  next.textContent = 'Continue';
+  next.className = 'btn-main';
+}
+
+function collectFormValues() {
+  function fval(id) {
+    var el = document.getElementById('f-' + id);
+    return el ? el.value.trim() : '';
+  }
+  var first = fval('first') || 'Visitor';
+  var last  = fval('last') || '';
+  var hostEl = document.getElementById('f-host');
+  var host = fval('host').split('-')[0].trim();
+  var hostEmail = hostEl && hostEl.selectedIndex > 0 ? (hostEl.options[hostEl.selectedIndex].getAttribute('data-email') || '') : '';
+  return {
+    first: first, last: last, host: host, hostEmail: hostEmail,
+    company: fval('company'), email: fval('email'),
+    phone: fval('phone'), purpose: fval('purpose')
+  };
+}
+
+function completeSignIn() {
+  var vals = collectFormValues();
+  var pair = CP[cpIdx % CP.length]; cpIdx++;
+  var v = {
+    id: 'VIS-' + String(db.nextId++).padStart(4,'0'),
+    first: vals.first, last: vals.last,
+    company: vals.company, email: vals.email, phone: vals.phone,
+    host: vals.host, hostEmail: vals.hostEmail, purpose: vals.purpose,
+    arrived: ts(), departed: null, status: 'in',
+    date: new Date().toDateString(),
+    ini: ((vals.first[0]||'V') + (vals.last[0]||'V')).toUpperCase(),
+    cbg: pair[0], cfg: pair[1]
+  };
+  db.visitors.unshift(v); saveV(db);
+  document.getElementById('si-sname').textContent = 'Welcome, ' + vals.first + '!';
+  document.getElementById('si-smeta').textContent = 'Signed in to visit ' + vals.host;
+  showSiStep(3);
+}
+
+function validateStep1() {
+  var fields = getFields();
+  var valid = true;
+  fields.forEach(function(f) {
+    if (!fieldEnabled(f) || !f.mandatory) return;
+    var el = document.getElementById('f-' + f.id);
+    if (!el || !el.value || !el.value.trim()) {
+      if (valid) alert('Please fill in: ' + f.label);
+      valid = false;
+    }
+  });
+  return valid;
 }
 
 function siNext() {
+  var bar  = document.getElementById('si-bar');
+  var next = document.getElementById('si-next');
+
   if (siStep === 1) {
-    var fields = getFields();
-    // Validate mandatory visible fields
-    var valid = true;
-    fields.forEach(function(f) {
-      if (!fieldEnabled(f) || !f.mandatory) return;
-      var el = document.getElementById('f-' + f.id);
-      if (!el) return;
-      if (!el.value || !el.value.trim()) {
-        alert('Please fill in: ' + f.label);
-        valid = false;
-      }
-    });
-    if (!valid) return;
+    if (!validateStep1()) return;
     showSiStep(2);
   } else if (siStep === 2) {
     if (!document.getElementById('agree1').checked || !document.getElementById('agree2').checked) {
       alert('Please accept both agreements'); return;
     }
-    var fields2 = getFields();
-    function fval(id) {
-      var el = document.getElementById('f-' + id);
-      return el ? el.value.trim() : '';
-    }
-    var first = fval('first') || 'Visitor';
-    var last  = fval('last') || '';
-    var host  = fval('host').split('-')[0].trim();
-    var hostOpt = document.getElementById('f-host');
-    var hostEmail = hostOpt && hostOpt.selectedIndex > 0 ? (hostOpt.options[hostOpt.selectedIndex].getAttribute('data-email') || '') : '';
-    var pair = CP[cpIdx % CP.length]; cpIdx++;
-    var v = {
-      id: 'VIS-' + String(db.nextId++).padStart(4,'0'),
-      first: first, last: last,
-      company: fval('company'), email: fval('email'), phone: fval('phone'),
-      host: host, hostEmail: hostEmail, purpose: fval('purpose'),
-      arrived: ts(), departed: null, status: 'in',
-      date: new Date().toDateString(),
-      ini: ((first[0]||'V') + (last[0]||'V')).toUpperCase(),
-      cbg: pair[0], cfg: pair[1]
-    };
-    db.visitors.unshift(v); saveV(db);
-    document.getElementById('si-sname').textContent = 'Welcome, ' + first + '!';
-    document.getElementById('si-smeta').textContent = 'Signed in to visit ' + host;
-    showSiStep(3);
+    completeSignIn();
   }
 }
 
 function resetSi() {
+  rvMode = false;
+  rvVisitor = null;
   buildSignInForm();
   document.getElementById('agree1').checked = false;
   document.getElementById('agree2').checked = false;
-  showSiStep(1);
+  siStep = 1;
+  // Show the returning visitor question first
+  showStep('si-s0');
+  document.getElementById('si-bar').style.display = 'none';
 }
+
+/* ── Returning visitor flow ────────────────────────────── */
+function searchReturningVisitor() {
+  var q = (document.getElementById('rv-search').value || '').toLowerCase().trim();
+  if (!q) return;
+  var results = document.getElementById('rv-results');
+
+  // Search by name or email across all past visitors (deduplicated by email/name)
+  var seen = {};
+  var matches = db.visitors.filter(function(v) {
+    var key = (v.email || (v.first + v.last)).toLowerCase();
+    if (seen[key]) return false;
+    seen[key] = true;
+    var nameMatch = (v.first + ' ' + v.last).toLowerCase().indexOf(q) >= 0;
+    var emailMatch = v.email && v.email.toLowerCase().indexOf(q) >= 0;
+    return nameMatch || emailMatch;
+  }).slice(0, 8);
+
+  if (!matches.length) {
+    results.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:14px">' +
+      '&#128269; No previous visits found.<br/><br/>' +
+      '<button class="btn-full" id="rv-no-match" style="background:var(--bg2);color:var(--tx);border:1.5px solid var(--br2)">Continue as new visitor</button>' +
+      '</div>';
+    document.getElementById('rv-no-match').addEventListener('click', function() {
+      rvMode = false;
+      buildSignInForm();
+      showSiStep(1);
+      document.getElementById('si-prev').style.display = '';
+    });
+    return;
+  }
+
+  results.innerHTML = '<div style="font-size:13px;color:var(--tx3);margin-bottom:10px">Select your name to pre-fill details:</div>' +
+    matches.map(function(v) {
+      var lastVisit = v.date || '';
+      return '<div class="rv-result-row" data-id="' + v.id + '" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;border:1px solid var(--br);margin-bottom:8px;cursor:pointer;background:var(--bg)">' +
+        avHtml(v, 40) +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:15px;font-weight:600">' + esc(v.first) + ' ' + esc(v.last) + '</div>' +
+          '<div style="font-size:12px;color:var(--tx3)">' + (v.email ? esc(v.email) + ' &middot; ' : '') + esc(v.company||'') + '</div>' +
+          '<div style="font-size:11px;color:var(--tx3)">Last visit: ' + lastVisit + '</div>' +
+        '</div>' +
+        '<span style="color:var(--blue);font-size:20px">&#8250;</span>' +
+      '</div>';
+    }).join('');
+
+  results.querySelectorAll('.rv-result-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var v = db.visitors.find(function(x) { return x.id === id; });
+      if (!v) return;
+      rvMode = true;
+      rvVisitor = v;
+      showConfirmDetails(v);
+    });
+  });
+}
+
+function showConfirmDetails(v) {
+  var fields = getFields();
+  var container = document.getElementById('rv-confirm-fields');
+
+  // Build editable confirm form pre-filled with past data
+  var fmap = { first:v.first, last:v.last, email:v.email||'', phone:v.phone||'', company:v.company||'' };
+  var html = '';
+
+  // First + Last in row if both enabled
+  var firstF = fields.find(function(f){ return f.id==='first'; });
+  var lastF  = fields.find(function(f){ return f.id==='last' && fieldEnabled(f); });
+  var skipIds = {};
+
+  if (firstF && lastF) {
+    html += '<div class="row2">';
+    html += buildConfirmField(firstF, fmap.first);
+    html += buildConfirmField(lastF, fmap.last);
+    html += '</div>';
+    skipIds['first'] = true; skipIds['last'] = true;
+  }
+
+  fields.forEach(function(f) {
+    if (skipIds[f.id] || !fieldEnabled(f)) return;
+    html += buildConfirmField(f, fmap[f.id] || '');
+  });
+
+  container.innerHTML = html;
+
+  // Populate host select
+  populateHostSelect();
+
+  // Show bar with next button
+  var bar  = document.getElementById('si-bar');
+  var next = document.getElementById('si-next');
+  var prev = document.getElementById('si-prev');
+  bar.style.display = 'flex';
+  prev.style.display = '';
+  next.textContent = 'Confirm & Continue';
+  next.className = 'btn-main';
+  siStep = 'rv-confirm'; // special state
+
+  showStep('si-s0c');
+}
+
+function buildConfirmField(f, val) {
+  var req = f.mandatory ? ' <span style="color:var(--rd)">*</span>' : '';
+  var html = '<div class="field">';
+  html += '<label>' + esc(f.label) + req + '</label>';
+  if (f.id === 'host') {
+    html += '<select id="f-host"><option value="">Select host...</option></select>';
+  } else if (f.id === 'purpose') {
+    html += '<select id="f-purpose"><option value="">Select...</option>';
+    ['Meeting / interview','Delivery / contractor','Client visit','Building maintenance','Other'].forEach(function(o) {
+      html += '<option>' + o + '</option>';
+    });
+    html += '</select>';
+  } else {
+    html += '<input id="f-' + f.id + '" type="' + (f.type||'text') + '" value="' + esc(val||'') + '" placeholder="' + esc(f.ph||'') + '" autocomplete="' + esc(f.ac||'') + '"/>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// Override siNext to handle rv-confirm state
+var _origSiNext = siNext;
+siNext = function() {
+  if (siStep === 'rv-confirm') {
+    if (!validateStep1()) return;
+    // Move to agreement
+    siStep = 2;
+    showSiStep(2);
+    // Update step dots in s2 to show 3 dots for returning flow
+    var stepsEl = document.querySelector('#si-s2 .steps');
+    if (stepsEl && rvMode) {
+      stepsEl.innerHTML = '<div class="step done"></div><div class="step done"></div><div class="step active"></div>';
+    }
+    return;
+  }
+  _origSiNext();
+};
 
 /* ── Sign-out ──────────────────────────────────────────── */
 var soV = null;
@@ -774,9 +1004,40 @@ document.addEventListener('DOMContentLoaded', function() {
     show('screen-admin');
   });
 
+  // Returning visitor flow
+  document.getElementById('si-returning').addEventListener('click', function() {
+    document.getElementById('rv-search').value = '';
+    document.getElementById('rv-results').innerHTML = '';
+    document.getElementById('si-bar').style.display = 'none';
+    showStep('si-s0b');
+  });
+  document.getElementById('si-new').addEventListener('click', function() {
+    rvMode = false; rvVisitor = null;
+    buildSignInForm();
+    showSiStep(1);
+  });
+  document.getElementById('rv-lookup').addEventListener('click', searchReturningVisitor);
+  document.getElementById('rv-search').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') searchReturningVisitor();
+  });
+
   // Sign-in
   document.getElementById('si-back').addEventListener('click', function() {
-    if (siStep === 1) { show('screen-home'); } else { showSiStep(siStep - 1); }
+    if (siStep === 'rv-confirm') {
+      // Back to search results
+      showStep('si-s0b');
+      document.getElementById('si-bar').style.display = 'none';
+      siStep = 1;
+    } else if (siStep === 2 && rvMode) {
+      showConfirmDetails(rvVisitor);
+    } else if (siStep === 2) {
+      showSiStep(1);
+    } else if (siStep === 1 && rvMode) {
+      showStep('si-s0b');
+      document.getElementById('si-bar').style.display = 'none';
+    } else {
+      show('screen-home');
+    }
   });
   document.getElementById('si-next').addEventListener('click', siNext);
   document.getElementById('si-prev').addEventListener('click', function() { showSiStep(siStep - 1); });
@@ -836,6 +1097,8 @@ document.addEventListener('DOMContentLoaded', function() {
   buildSignInForm();
   renderEmpList();
   show('screen-home');
+  // Ensure bar is hidden on home screen init
+  document.getElementById('si-bar').style.display = 'none';
 });
 
 })();
