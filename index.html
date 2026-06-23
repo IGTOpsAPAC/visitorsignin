@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0061)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_10.html -->
+<!-- saved from url=(0061)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_12.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -321,12 +321,44 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
         <div class="import-drop" id="import-drop">
           <div style="font-size:28px;margin-bottom:6px">📂</div>
           <div style="font-size:14px;font-weight:600;color:var(--blue)">Tap to import employees CSV</div>
-          <div style="font-size:12px;color:var(--tx3);margin-top:4px">Columns: Name, Email (+ optional Department)</div>
+          <div style="font-size:12px;color:var(--tx3);margin-top:4px">Columns: Name, Email, Department, TeamsWebhook</div>
           <input type="file" id="emp-file" accept=".csv" style="display:none">
         </div>
         <div id="emp-status" style="font-size:13px;color:var(--tx3);margin-top:10px;display:none"></div>
         <div id="emp-list" style="margin-top:8px;max-height:220px;overflow-y:auto"></div>
         <button class="btn-sec" id="btn-clear-emp" style="display:none;color:var(--rd);border-color:var(--rd)">🗑 Clear employee list</button>
+      </div>
+
+      <!-- Teams webhook management -->
+      <div class="card" style="margin-top:4px">
+        <div class="card-title" style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">💬</span> Teams notifications
+        </div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Add a Teams webhook URL per employee so they get a Teams message when their visitor arrives. You can add these manually below or include a <b>TeamsWebhook</b> column in your employee CSV.</p>
+        <div id="webhook-list"></div>
+        <div style="margin-top:12px;background:var(--bg2);border-radius:10px;padding:14px">
+          <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Add / update webhook</div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Employee</label>
+            <select id="wh-emp-select"><option value="">Select employee...</option></select>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>Teams webhook URL</label>
+            <input id="wh-url" type="url" placeholder="https://prod-xx.westus.logic.azure.com/..." style="font-size:13px">
+          </div>
+          <button class="btn-full" id="btn-save-webhook" style="padding:11px;font-size:14px">Save webhook</button>
+        </div>
+        <div style="margin-top:10px;background:var(--bg2);border-radius:10px;padding:12px">
+          <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">How to get a webhook URL in Teams:</div>
+          <ol style="font-size:12px;color:var(--tx3);padding-left:16px;line-height:1.8">
+            <li>Open Microsoft Teams</li>
+            <li>Go to a channel (e.g. your personal channel or reception)</li>
+            <li>Click ⋯ next to channel name → Connectors</li>
+            <li>Find <b>Incoming Webhook</b> → Configure</li>
+            <li>Name it (e.g. "Visitor Alert") → Create</li>
+            <li>Copy the URL and paste it above</li>
+          </ol>
+        </div>
       </div>
 
       <!-- Field settings -->
@@ -535,9 +567,10 @@ function collectFormValues() {
   var last  = fval('last') || '';
   var hostEl = document.getElementById('f-host');
   var host = fval('host').split('-')[0].trim();
-  var hostEmail = hostEl && hostEl.selectedIndex > 0 ? (hostEl.options[hostEl.selectedIndex].getAttribute('data-email') || '') : '';
+  var hostEmail   = hostEl && hostEl.selectedIndex > 0 ? (hostEl.options[hostEl.selectedIndex].getAttribute('data-email')   || '') : '';
+  var hostWebhook = hostEl && hostEl.selectedIndex > 0 ? (hostEl.options[hostEl.selectedIndex].getAttribute('data-webhook') || '') : '';
   return {
-    first: first, last: last, host: host, hostEmail: hostEmail,
+    first: first, last: last, host: host, hostEmail: hostEmail, hostWebhook: hostWebhook,
     company: fval('company'), email: fval('email'),
     phone: fval('phone'), purpose: fval('purpose')
   };
@@ -550,13 +583,22 @@ function completeSignIn() {
     id: 'VIS-' + String(db.nextId++).padStart(4,'0'),
     first: vals.first, last: vals.last,
     company: vals.company, email: vals.email, phone: vals.phone,
-    host: vals.host, hostEmail: vals.hostEmail, purpose: vals.purpose,
+    host: vals.host, hostEmail: vals.hostEmail, hostWebhook: vals.hostWebhook, purpose: vals.purpose,
     arrived: ts(), departed: null, status: 'in',
     date: new Date().toDateString(),
     ini: ((vals.first[0]||'V') + (vals.last[0]||'V')).toUpperCase(),
     cbg: pair[0], cfg: pair[1]
   };
   db.visitors.unshift(v); saveV(db);
+  // Send Teams notification if webhook configured
+  if (vals.hostWebhook) {
+    sendTeamsNotification(vals.hostWebhook, v);
+  } else {
+    // Try to find webhook from employee list (in case not set on option)
+    var emps = loadE();
+    var emp = emps.find(function(e) { return e.name === vals.host || e.name.indexOf(vals.host) === 0; });
+    if (emp && emp.webhook) sendTeamsNotification(emp.webhook, v);
+  }
   document.getElementById('si-sname').textContent = 'Welcome, ' + vals.first + '!';
   document.getElementById('si-smeta').textContent = 'Signed in to visit ' + vals.host;
   showSiStep(3);
@@ -794,7 +836,7 @@ function pinKey(k) {
     if (pin === PIN) {
       document.getElementById('admin-pin').style.display = 'none';
       document.getElementById('admin-dash').style.display = 'flex';
-      renderAdmin(); renderEmpList(); renderFieldSettings();
+      renderAdmin(); renderEmpList(); renderFieldSettings(); renderWebhookList(); populateWebhookEmpSelect();
     } else { alert('Incorrect PIN'); pin = ''; }
   } else if (pin.length < 4) { pin += k; }
   [0,1,2,3].forEach(function(i) {
@@ -875,6 +917,7 @@ function populateHostSelect() {
       var o = document.createElement('option');
       o.value = e.name;
       o.setAttribute('data-email', e.email || '');
+      o.setAttribute('data-webhook', e.webhook || '');
       o.textContent = e.name + (e.dept ? ' - ' + e.dept : '');
       sel.appendChild(o);
     });
@@ -895,7 +938,7 @@ function renderEmpList() {
     var ini = (e.name||'?').split(' ').map(function(w) { return w[0]||''; }).slice(0,2).join('').toUpperCase();
     return '<div class="emp-row"><div class="emp-av">' + ini + '</div>' +
       '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + esc(e.name) + '</div>' +
-      '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email||'') + (e.dept ? ' &middot; '+esc(e.dept) : '') + '</div></div></div>';
+      '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email||'') + (e.dept ? ' &middot; '+esc(e.dept) : '') + (e.webhook ? ' <span style="color:var(--g);font-weight:700">&#128172;</span>' : '') + '</div></div></div>';
   }).join('') + (emps.length > 60 ? '<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and '+(emps.length-60)+' more</div>' : '');
 }
 
@@ -918,7 +961,7 @@ function parseCSV(text) {
     }
     cols.push(cur.trim());
     cols = cols.map(function(c) { return c.replace(/"/g,'').trim(); });
-    var name = '', email = '', dept = '';
+    var name = '', email = '', dept = '', webhook = '';
     if (headers) {
       headers.forEach(function(h, i) {
         var v = cols[i] || '';
@@ -927,13 +970,119 @@ function parseCSV(text) {
         else if (h==='last name'||h==='lastname'||h==='surname'||h==='last') name = (name?name+' ':'')+v;
         else if (h==='email'||h==='email address'||h==='emailaddress') email = v;
         else if (h==='department'||h==='dept'||h==='team'||h==='division') dept = v;
+        else if (h==='teamswebhook'||h==='webhook'||h==='teams webhook'||h==='teams_webhook') webhook = v;
       });
     } else {
-      name = cols[0]||''; email = cols[1]||''; dept = cols[2]||'';
+      name = cols[0]||''; email = cols[1]||''; dept = cols[2]||''; webhook = cols[3]||'';
     }
-    if (name) emps.push({name:name, email:email, dept:dept});
+    if (name) emps.push({name:name, email:email, dept:dept, webhook:webhook});
   });
   return emps;
+}
+
+/* ── Teams webhook notifications ──────────────────────── */
+function sendTeamsNotification(webhookUrl, visitor) {
+  if (!webhookUrl || !webhookUrl.startsWith('http')) return;
+  var arrived = visitor.arrived || '';
+  var payload = {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "themeColor": "0050C8",
+    "summary": "Visitor arrived: " + visitor.first + " " + visitor.last,
+    "sections": [{
+      "activityTitle": "&#128100; Visitor has arrived",
+      "activitySubtitle": new Date().toLocaleDateString('en-AU', {weekday:'long', day:'2-digit', month:'long', year:'numeric'}) + " at " + arrived,
+      "activityImage": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Font_Awesome_5_solid_user.svg/240px-Font_Awesome_5_solid_user.svg.png",
+      "facts": [
+        {"name": "Visitor", "value": visitor.first + " " + visitor.last},
+        {"name": "Company", "value": visitor.company || "—"},
+        {"name": "Purpose", "value": visitor.purpose || "—"},
+        {"name": "Arrived", "value": arrived},
+        {"name": "Visitor ID", "value": visitor.id}
+      ],
+      "markdown": true
+    }],
+    "potentialAction": []
+  };
+  fetch(webhookUrl, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  }).then(function(res) {
+    if (!res.ok) console.warn('Teams webhook responded with', res.status);
+  }).catch(function(err) {
+    console.warn('Teams webhook failed:', err);
+  });
+}
+
+/* ── Webhook management UI ─────────────────────────────── */
+function renderWebhookList() {
+  var emps = loadE();
+  var list = document.getElementById('webhook-list');
+  if (!list) return;
+  var withWebhook = emps.filter(function(e) { return e.webhook; });
+  if (!withWebhook.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--tx3);padding:8px 0;text-align:center">No webhooks configured yet.<br/>Add one below or import via CSV.</div>';
+    return;
+  }
+  list.innerHTML = withWebhook.map(function(e) {
+    var ini = (e.name||'?').split(' ').map(function(w){return w[0]||'';}).slice(0,2).join('').toUpperCase();
+    var shortUrl = e.webhook.length > 40 ? e.webhook.substring(0,40)+'...' : e.webhook;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--br)">' +
+      '<div class="emp-av">' + ini + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:13px;font-weight:500">' + esc(e.name) + '</div>' +
+        '<div style="font-size:11px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(shortUrl) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px">' +
+        '<button class="wh-test-btn" data-name="' + esc(e.name) + '" style="background:var(--bl);color:var(--bd);border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer">Test</button>' +
+        '<button class="wh-del-btn" data-name="' + esc(e.name) + '" style="background:var(--rl);color:var(--rd);border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer">Remove</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  list.querySelectorAll('.wh-del-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
+      var emps2 = loadE();
+      var emp = emps2.find(function(e) { return e.name === name; });
+      if (emp) { emp.webhook = ''; saveE(emps2); renderWebhookList(); populateHostSelect(); }
+    });
+  });
+
+  list.querySelectorAll('.wh-test-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
+      var emps2 = loadE();
+      var emp = emps2.find(function(e) { return e.name === name; });
+      if (!emp || !emp.webhook) return;
+      sendTeamsNotification(emp.webhook, {
+        first: 'Test', last: 'Visitor', company: 'IGT Test',
+        purpose: 'Test notification', arrived: '09:00', id: 'VIS-TEST'
+      });
+      alert('Test message sent to ' + name + ' - Teams channel!');
+    });
+  });
+}
+
+function populateWebhookEmpSelect() {
+  var sel = document.getElementById('wh-emp-select');
+  if (!sel) return;
+  var emps = loadE();
+  sel.innerHTML = '<option value="">Select employee...</option>';
+  emps.forEach(function(e) {
+    var o = document.createElement('option');
+    o.value = e.name;
+    o.textContent = e.name + (e.dept ? ' - ' + e.dept : '') + (e.webhook ? ' &#10003;' : '');
+    sel.appendChild(o);
+  });
+  // Pre-fill URL if employee already has one
+  sel.addEventListener('change', function() {
+    var emps2 = loadE();
+    var emp = emps2.find(function(e) { return e.name === sel.value; });
+    var urlInput = document.getElementById('wh-url');
+    if (urlInput) urlInput.value = emp ? (emp.webhook || '') : '';
+  });
 }
 
 /* ── Field settings ────────────────────────────────────── */
@@ -1101,6 +1250,25 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!confirm('Clear all employees and restore defaults?')) return;
     localStorage.removeItem('igt_emp_v1');
     renderEmpList(); populateHostSelect();
+  });
+
+  // Teams webhook management
+  document.getElementById('btn-save-webhook').addEventListener('click', function() {
+    var empName = document.getElementById('wh-emp-select').value;
+    var url     = (document.getElementById('wh-url').value || '').trim();
+    if (!empName) { alert('Please select an employee'); return; }
+    if (url && !url.startsWith('http')) { alert('Please enter a valid webhook URL starting with http'); return; }
+    var emps = loadE();
+    var emp = emps.find(function(e) { return e.name === empName; });
+    if (!emp) { alert('Employee not found. Please import employees first.'); return; }
+    emp.webhook = url;
+    saveE(emps);
+    renderWebhookList();
+    populateHostSelect();
+    populateWebhookEmpSelect();
+    document.getElementById('wh-url').value = '';
+    document.getElementById('wh-emp-select').value = '';
+    alert('Webhook ' + (url ? 'saved' : 'removed') + ' for ' + empName);
   });
 
   // Field settings reset
