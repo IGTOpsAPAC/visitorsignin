@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_8.html -->
+<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_9.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -195,7 +195,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
       <div class="steps"><div class="step active"></div><div class="step"></div></div>
       <div class="card" id="si-form-card">
         <div class="card-title">Your details</div>
-        <div id="si-dynamic-fields"></div>
+        <div id="si-dynamic-fields"><div class="row2"><div class="field"><label>First name <span style="color:var(--rd)">*</span></label><input id="f-first" type="text" placeholder="Jane" autocomplete="given-name"></div><div class="field"><label>Last name <span style="color:var(--rd)">*</span></label><input id="f-last" type="text" placeholder="Smith" autocomplete="family-name"></div></div><div class="field"><label>Email</label><input id="f-email" type="email" placeholder="jane@company.com" autocomplete="email"></div><div class="field"><label>Phone</label><input id="f-phone" type="tel" placeholder="+61 4xx xxx xxx" autocomplete="tel"></div><div class="field"><label>Company</label><input id="f-company" type="text" placeholder="Acme Corp" autocomplete="organization"></div><div class="field"><label>Host / Person visiting <span style="color:var(--rd)">*</span></label><select id="f-host"><option value="">Select host...</option><option value="Alex Chen - Engineering">Alex Chen - Engineering</option><option value="Sarah Park - HR">Sarah Park - HR</option><option value="Marcus Webb - Finance">Marcus Webb - Finance</option><option value="Priya Nair - Legal">Priya Nair - Legal</option><option value="Tom Ellison - CEO">Tom Ellison - CEO</option></select></div><div class="field"><label>Purpose of visit <span style="color:var(--rd)">*</span></label><select id="f-purpose"><option value="">Select...</option><option>Meeting / interview</option><option>Delivery / contractor</option><option>Client visit</option><option>Building maintenance</option><option>Other</option></select></div></div>
       </div>
     </div>
 
@@ -225,7 +225,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
     </div>
 
   </div>
-  <div class="bottom-bar" id="si-bar">
+  <div class="bottom-bar" id="si-bar" style="display: none;">
     <button class="btn-back2" id="si-prev" style="display:none">Back</button>
     <button class="btn-main" id="si-next">Continue</button>
   </div>
@@ -327,6 +327,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
         <div id="emp-list" style="margin-top:8px;max-height:220px;overflow-y:auto"></div>
         <button class="btn-sec" id="btn-clear-emp" style="display:none;color:var(--rd);border-color:var(--rd)">🗑 Clear employee list</button>
       </div>
+
+      <!-- Field settings -->
+      <div class="card" style="margin-top:4px">
+        <div class="card-title">Sign-in form fields</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Toggle fields on or off and set whether they are mandatory. Locked fields are always shown.</p>
+        <div id="field-settings-list"></div>
+        <button class="btn-sec" id="btn-reset-fields" style="margin-top:4px">↻ Reset to defaults</button>
+      </div>
+
     </div>
   </div>
 
