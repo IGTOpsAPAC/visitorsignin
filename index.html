@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_9.html -->
+<!-- saved from url=(0061)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_10.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -255,7 +255,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
           <div class="success-title" id="so-sname">Signed out</div>
           <div class="success-sub">Thank you for visiting IGT.<br>Please return your visitor badge.</div>
           <div class="notif" style="justify-content:center">👋 Have a safe journey!</div>
-          <button class="btn-full" id="so-done">Back to Home</button>
+          <div style="font-size:13px;color:var(--tx3);margin-top:10px" id="so-countdown">Returning to home in 2 seconds...</div>
+          <button class="btn-full" id="so-done" style="margin-top:10px">Back to Home Now</button>
         </div>
       </div>
     </div>
@@ -774,6 +775,13 @@ function soConfirm() {
   document.getElementById('so-success').style.display = 'block';
   document.getElementById('so-q').value = '';
   soV = null;
+  // Auto-return to home after 2 seconds
+  setTimeout(function() {
+    document.getElementById('so-result').style.display = 'none';
+    document.getElementById('so-success').style.display = 'none';
+    document.getElementById('so-q').value = '';
+    show('screen-home');
+  }, 2000);
 }
 
 /* ── Admin PIN ─────────────────────────────────────────── */
@@ -820,7 +828,7 @@ function renderLog() {
     return '<div class="vrow">' + avHtml(v) +
       '<div class="vinfo"><div class="vname">' + esc(v.first) + ' ' + esc(v.last) +
       ' <span style="font-size:11px;color:var(--tx3)">' + v.id + '</span></div>' +
-      '<div class="vmeta">' + esc(v.host) + ' &middot; In: ' + v.arrived + (v.departed ? ' Out: ' + v.departed : '') + '</div></div>' +
+      '<div class="vmeta">' + esc(v.host) + ' &middot; In: ' + v.arrived + (v.departed ? ' Out: ' + v.departed : '') + (v.autoSignOff ? ' <span style="font-size:10px;background:#FFF3E0;color:#9a5f00;padding:1px 6px;border-radius:8px;font-weight:600">AUTO</span>' : '') + '</div></div>' +
       (v.status === 'in' ? '<button class="sout-btn" data-id="' + v.id + '">Sign out</button>' : '<span class="tag-out">Out</span>') +
       '</div>';
   }).join('');
@@ -840,9 +848,9 @@ function setTab(f) {
 }
 
 function exportCSV() {
-  var rows = ['ID,First,Last,Company,Email,Host,Purpose,Arrived,Departed,Status,Date'].concat(
+  var rows = ['ID,First,Last,Company,Email,Host,Purpose,Arrived,Departed,Status,Date,Notes'].concat(
     db.visitors.map(function(v) {
-      return [v.id,v.first,v.last,v.company||'',v.email||'',v.host,v.purpose,v.arrived,v.departed||'',v.status,v.date].join(',');
+      return [v.id,v.first,v.last,v.company||'',v.email||'',v.host,v.purpose,v.arrived,v.departed||'',v.status,v.date,v.autoSignOff?'Auto sign-off by system at 6pm':''].join(',');
     })
   );
   var a = document.createElement('a');
@@ -1101,6 +1109,48 @@ document.addEventListener('DOMContentLoaded', function() {
     localStorage.removeItem('igt_fields_v1');
     renderFieldSettings();
   });
+
+  // ── Auto sign-off at 6pm ──────────────────────────────
+  function autoSignOff() {
+    var now = new Date();
+    var h = now.getHours(), m = now.getMinutes();
+    if (h < 18) return; // only after 6pm
+    var onsite = db.visitors.filter(function(v) { return v.status === 'in'; });
+    if (!onsite.length) return;
+    var signedOff = [];
+    onsite.forEach(function(v) {
+      v.status = 'out';
+      v.departed = '18:00';
+      v.autoSignOff = true; // flag for log note
+      signedOff.push(v.first + ' ' + v.last);
+    });
+    saveV(db);
+    if (signedOff.length > 0) {
+      console.log('Auto sign-off at 6pm:', signedOff.join(', '));
+    }
+  }
+
+  function scheduleAutoSignOff() {
+    var now = new Date();
+    var target = new Date(now);
+    target.setHours(18, 0, 0, 0);
+    // If already past 6pm today, run immediately then schedule tomorrow
+    if (now >= target) {
+      autoSignOff();
+      target.setDate(target.getDate() + 1);
+    }
+    var msUntil = target - now;
+    setTimeout(function() {
+      autoSignOff();
+      // Then repeat every 24 hours
+      setInterval(autoSignOff, 24 * 60 * 60 * 1000);
+    }, msUntil);
+  }
+
+  scheduleAutoSignOff();
+
+  // Also check on page load in case app was opened after 6pm with visitors still in
+  autoSignOff();
 
   // Init
   buildSignInForm();
