@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_6.html -->
+<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_7.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -111,6 +111,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
 .emp-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--br)}
 .emp-row:last-child{border-bottom:none}
 .emp-av{width:32px;height:32px;border-radius:50%;background:#DDEEFF;color:#003A96;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+
+/* Field toggles */
+.tog{position:relative;display:inline-block;width:40px;height:22px;cursor:pointer}
+.tog input{opacity:0;width:0;height:0;position:absolute}
+.tog-sl{position:absolute;inset:0;background:var(--br2);border-radius:22px;transition:background 0.2s}
+.tog-sl::before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform 0.2s}
+.tog input:checked + .tog-sl{background:var(--blue)}
+.tog input:checked + .tog-sl.req-color{background:var(--rd)}
+.tog input:checked + .tog-sl::before{transform:translateX(18px)}
 </style>
 </head>
 <body>
@@ -144,28 +153,9 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
     <!-- Step 1: Details -->
     <div id="si-s1">
       <div class="steps"><div class="step active"></div><div class="step"></div></div>
-      <div class="card">
+      <div class="card" id="si-form-card">
         <div class="card-title">Your details</div>
-        <div class="row2">
-          <div class="field"><label>First name</label><input id="f-first" type="text" placeholder="Jane" autocomplete="given-name"></div>
-          <div class="field"><label>Last name</label><input id="f-last" type="text" placeholder="Smith" autocomplete="family-name"></div>
-        </div>
-        <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="jane@company.com" autocomplete="email"></div>
-        <div class="field"><label>Phone (optional)</label><input id="f-phone" type="tel" placeholder="+61 4xx xxx xxx" autocomplete="tel"></div>
-        <div class="field"><label>Company</label><input id="f-company" type="text" placeholder="Acme Corp" autocomplete="organization"></div>
-        <div class="field"><label>Host / Person visiting</label>
-          <select id="f-host"><option value="">Select host...</option><option value="Alex Chen - Engineering">Alex Chen - Engineering</option><option value="Sarah Park - HR">Sarah Park - HR</option><option value="Marcus Webb - Finance">Marcus Webb - Finance</option><option value="Priya Nair - Legal">Priya Nair - Legal</option><option value="Tom Ellison - CEO">Tom Ellison - CEO</option></select>
-        </div>
-        <div class="field"><label>Purpose of visit</label>
-          <select id="f-purpose">
-            <option value="">Select...</option>
-            <option>Meeting / interview</option>
-            <option>Delivery / contractor</option>
-            <option>Client visit</option>
-            <option>Building maintenance</option>
-            <option>Other</option>
-          </select>
-        </div>
+        <div id="si-dynamic-fields"></div>
       </div>
     </div>
 
@@ -308,24 +298,54 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
 'use strict';
 
 /* ── Storage ───────────────────────────────────────────── */
-var VDB = 'igt_v4', EDB = 'igt_emp_v1';
+var VDB = 'igt_v4', EDB = 'igt_emp_v1', FDB = 'igt_fields_v1';
+
 function loadV() { try { var d = localStorage.getItem(VDB); return d ? JSON.parse(d) : {visitors:[], nextId:1}; } catch(e) { return {visitors:[], nextId:1}; } }
 function saveV(db) { try { localStorage.setItem(VDB, JSON.stringify(db)); } catch(e) {} }
 function loadE() { try { var d = localStorage.getItem(EDB); return d ? JSON.parse(d) : []; } catch(e) { return []; } }
 function saveE(emps) { try { localStorage.setItem(EDB, JSON.stringify(emps)); } catch(e) {} }
+function loadF() { try { var d = localStorage.getItem(FDB); return d ? JSON.parse(d) : null; } catch(e) { return null; } }
+function saveF(cfg) { try { localStorage.setItem(FDB, JSON.stringify(cfg)); } catch(e) {} }
+
+/* ── Field definitions ─────────────────────────────────── */
+var DEFAULT_FIELDS = [
+  { id:'first',    label:'First name',   type:'text',   ac:'given-name',   ph:'Jane',               alwaysOn:true,  mandatory:true  },
+  { id:'last',     label:'Last name',    type:'text',   ac:'family-name',  ph:'Smith',              alwaysOn:false, mandatory:true  },
+  { id:'email',    label:'Email',        type:'email',  ac:'email',        ph:'jane@company.com',   alwaysOn:false, mandatory:false },
+  { id:'phone',    label:'Phone',        type:'tel',    ac:'tel',          ph:'+61 4xx xxx xxx',    alwaysOn:false, mandatory:false },
+  { id:'company',  label:'Company',      type:'text',   ac:'organization', ph:'Acme Corp',          alwaysOn:false, mandatory:false },
+  { id:'host',     label:'Host / Person visiting', type:'select', alwaysOn:true, mandatory:true  },
+  { id:'purpose',  label:'Purpose of visit',       type:'select', alwaysOn:false, mandatory:true  }
+];
+
+function getFields() {
+  var saved = loadF();
+  if (!saved) return DEFAULT_FIELDS.map(function(f) { return Object.assign({}, f); });
+  // Merge saved settings onto defaults (handles new fields added in future)
+  return DEFAULT_FIELDS.map(function(f) {
+    var s = saved.find(function(x) { return x.id === f.id; });
+    if (!s) return Object.assign({}, f);
+    return Object.assign({}, f, { enabled: s.enabled, mandatory: s.mandatory });
+  });
+}
+
+function fieldEnabled(f) {
+  if (f.alwaysOn) return true;
+  return f.enabled !== false; // default on unless explicitly disabled
+}
 
 var db = loadV();
 
 /* Seed sample visitors */
 if (db.visitors.length === 0) {
   var td = new Date().toDateString();
-  var CP = [['#DDEEFF','#003A96'],['#E6F5E6','#1a6b1a'],['#FFF3E0','#9a5f00']];
+  var CP0 = [['#DDEEFF','#003A96'],['#E6F5E6','#1a6b1a'],['#FFF3E0','#9a5f00']];
   [{first:'Jane',last:'Smith',company:'Acme Corp',host:'Alex Chen',purpose:'Meeting',arrived:'08:54',departed:null,status:'in'},
    {first:'Rahul',last:'Gupta',company:'TechVen',host:'Sarah Park',purpose:'Client visit',arrived:'09:12',departed:null,status:'in'},
    {first:'Nina',last:'Torres',company:'Zenith',host:'Priya Nair',purpose:'Client visit',arrived:'07:15',departed:'08:50',status:'out'}
   ].forEach(function(s, i) {
     s.id = 'VIS-' + String(db.nextId++).padStart(4,'0');
-    s.cbg = CP[i][0]; s.cfg = CP[i][1];
+    s.cbg = CP0[i][0]; s.cfg = CP0[i][1];
     s.ini = (s.first[0] + s.last[0]).toUpperCase();
     s.date = td;
     db.visitors.push(s);
@@ -346,10 +366,64 @@ function avHtml(v, sz) {
 /* ── Screen routing ────────────────────────────────────── */
 function show(id) {
   ['screen-home','screen-signin','screen-signout','screen-admin'].forEach(function(s) {
-    var el = document.getElementById(s);
-    el.classList.remove('active');
+    document.getElementById(s).classList.remove('active');
   });
   document.getElementById(id).classList.add('active');
+}
+
+/* ── Dynamic form rendering ────────────────────────────── */
+function buildSignInForm() {
+  var fields = getFields();
+  var container = document.getElementById('si-dynamic-fields');
+  if (!container) return;
+
+  // Group first+last in a row if both enabled
+  var firstEnabled = fields.find(function(f) { return f.id === 'first'; });
+  var lastEnabled  = fields.find(function(f) { return f.id === 'last' && fieldEnabled(f); });
+
+  var html = '';
+  var skipIds = {};
+
+  if (firstEnabled && lastEnabled) {
+    html += '<div class="row2">';
+    html += buildFieldHtml(firstEnabled);
+    html += buildFieldHtml(lastEnabled);
+    html += '</div>';
+    skipIds['first'] = true;
+    skipIds['last'] = true;
+  }
+
+  fields.forEach(function(f) {
+    if (skipIds[f.id]) return;
+    if (!fieldEnabled(f)) return;
+    html += buildFieldHtml(f);
+  });
+
+  container.innerHTML = html;
+
+  // Populate host select
+  populateHostSelect();
+}
+
+function buildFieldHtml(f) {
+  var req = f.mandatory ? ' <span style="color:var(--rd)">*</span>' : '';
+  var html = '<div class="field">';
+  html += '<label>' + esc(f.label) + req + '</label>';
+
+  if (f.id === 'host') {
+    html += '<select id="f-host"><option value="">Select host...</option></select>';
+  } else if (f.id === 'purpose') {
+    html += '<select id="f-purpose"><option value="">Select...</option>';
+    ['Meeting / interview','Delivery / contractor','Client visit','Building maintenance','Other'].forEach(function(o) {
+      html += '<option>' + o + '</option>';
+    });
+    html += '</select>';
+  } else {
+    html += '<input id="f-' + f.id + '" type="' + (f.type||'text') + '" placeholder="' + esc(f.ph||'') + '" autocomplete="' + esc(f.ac||'') + '"/>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 /* ── Sign-in flow ──────────────────────────────────────── */
@@ -361,7 +435,7 @@ function showSiStep(n) {
     if (el) el.style.display = (i === n) ? 'block' : 'none';
   });
   siStep = n;
-  var bar = document.getElementById('si-bar');
+  var bar  = document.getElementById('si-bar');
   var next = document.getElementById('si-next');
   var prev = document.getElementById('si-prev');
   if (n === 3) { bar.style.display = 'none'; return; }
@@ -374,28 +448,40 @@ function showSiStep(n) {
 
 function siNext() {
   if (siStep === 1) {
-    if (!document.getElementById('f-first').value.trim()) { alert('Please enter your first name'); return; }
-    if (!document.getElementById('f-host').value) { alert('Please select a host'); return; }
-    if (!document.getElementById('f-purpose').value) { alert('Please select a purpose'); return; }
+    var fields = getFields();
+    // Validate mandatory visible fields
+    var valid = true;
+    fields.forEach(function(f) {
+      if (!fieldEnabled(f) || !f.mandatory) return;
+      var el = document.getElementById('f-' + f.id);
+      if (!el) return;
+      if (!el.value || !el.value.trim()) {
+        alert('Please fill in: ' + f.label);
+        valid = false;
+      }
+    });
+    if (!valid) return;
     showSiStep(2);
   } else if (siStep === 2) {
     if (!document.getElementById('agree1').checked || !document.getElementById('agree2').checked) {
       alert('Please accept both agreements'); return;
     }
-    var first = document.getElementById('f-first').value.trim() || 'Visitor';
-    var last = document.getElementById('f-last').value.trim() || '';
-    var host = document.getElementById('f-host').value.split('-')[0].trim();
-    var hostOpt = document.getElementById('f-host').options[document.getElementById('f-host').selectedIndex];
-    var hostEmail = hostOpt ? (hostOpt.getAttribute('data-email') || '') : '';
-    var purpose = document.getElementById('f-purpose').value;
+    var fields2 = getFields();
+    function fval(id) {
+      var el = document.getElementById('f-' + id);
+      return el ? el.value.trim() : '';
+    }
+    var first = fval('first') || 'Visitor';
+    var last  = fval('last') || '';
+    var host  = fval('host').split('-')[0].trim();
+    var hostOpt = document.getElementById('f-host');
+    var hostEmail = hostOpt && hostOpt.selectedIndex > 0 ? (hostOpt.options[hostOpt.selectedIndex].getAttribute('data-email') || '') : '';
     var pair = CP[cpIdx % CP.length]; cpIdx++;
     var v = {
       id: 'VIS-' + String(db.nextId++).padStart(4,'0'),
       first: first, last: last,
-      company: document.getElementById('f-company').value.trim(),
-      email: document.getElementById('f-email').value.trim(),
-      phone: document.getElementById('f-phone').value.trim(),
-      host: host, hostEmail: hostEmail, purpose: purpose,
+      company: fval('company'), email: fval('email'), phone: fval('phone'),
+      host: host, hostEmail: hostEmail, purpose: fval('purpose'),
       arrived: ts(), departed: null, status: 'in',
       date: new Date().toDateString(),
       ini: ((first[0]||'V') + (last[0]||'V')).toUpperCase(),
@@ -409,8 +495,7 @@ function siNext() {
 }
 
 function resetSi() {
-  ['f-first','f-last','f-email','f-phone','f-company'].forEach(function(id) { document.getElementById(id).value = ''; });
-  ['f-host','f-purpose'].forEach(function(id) { document.getElementById(id).selectedIndex = 0; });
+  buildSignInForm();
   document.getElementById('agree1').checked = false;
   document.getElementById('agree2').checked = false;
   showSiStep(1);
@@ -426,7 +511,7 @@ function soLookup() {
     return x.status === 'in' && (x.id.toLowerCase() === q || (x.first + ' ' + x.last).toLowerCase().indexOf(q) >= 0);
   });
   var result = document.getElementById('so-result');
-  var found = document.getElementById('so-found');
+  var found  = document.getElementById('so-found');
   document.getElementById('so-success').style.display = 'none';
   if (!v) {
     result.style.display = 'block';
@@ -462,14 +547,9 @@ function pinKey(k) {
     if (pin === PIN) {
       document.getElementById('admin-pin').style.display = 'none';
       document.getElementById('admin-dash').style.display = 'flex';
-      renderAdmin();
-      renderEmpList();
-    } else {
-      alert('Incorrect PIN'); pin = '';
-    }
-  } else if (pin.length < 4) {
-    pin += k;
-  }
+      renderAdmin(); renderEmpList(); renderFieldSettings();
+    } else { alert('Incorrect PIN'); pin = ''; }
+  } else if (pin.length < 4) { pin += k; }
   [0,1,2,3].forEach(function(i) {
     document.getElementById('pd' + i).classList.toggle('filled', i < pin.length);
   });
@@ -480,8 +560,8 @@ var logFilter = 'all';
 
 function renderAdmin() {
   var td = new Date().toDateString();
-  document.getElementById('m-on').textContent = db.visitors.filter(function(v) { return v.status === 'in'; }).length;
-  document.getElementById('m-td').textContent = db.visitors.filter(function(v) { return v.date === td; }).length;
+  document.getElementById('m-on').textContent  = db.visitors.filter(function(v) { return v.status === 'in'; }).length;
+  document.getElementById('m-td').textContent  = db.visitors.filter(function(v) { return v.date === td; }).length;
   document.getElementById('m-out').textContent = db.visitors.filter(function(v) { return v.status === 'out' && v.date === td; }).length;
   document.getElementById('m-all').textContent = db.visitors.length;
   renderLog();
@@ -490,8 +570,8 @@ function renderAdmin() {
 function renderLog() {
   var q = (document.getElementById('log-q').value || '').toLowerCase();
   var rows = db.visitors.filter(function(v) {
-    var m = (v.first + ' ' + v.last + ' ' + (v.company||'') + ' ' + v.host).toLowerCase().indexOf(q) >= 0;
-    if (logFilter === 'in') return m && v.status === 'in';
+    var m = (v.first+' '+v.last+' '+(v.company||'')+' '+v.host).toLowerCase().indexOf(q) >= 0;
+    if (logFilter === 'in')  return m && v.status === 'in';
     if (logFilter === 'out') return m && v.status === 'out';
     return m;
   });
@@ -523,7 +603,7 @@ function setTab(f) {
 function exportCSV() {
   var rows = ['ID,First,Last,Company,Email,Host,Purpose,Arrived,Departed,Status,Date'].concat(
     db.visitors.map(function(v) {
-      return [v.id, v.first, v.last, v.company||'', v.email||'', v.host, v.purpose, v.arrived, v.departed||'', v.status, v.date].join(',');
+      return [v.id,v.first,v.last,v.company||'',v.email||'',v.host,v.purpose,v.arrived,v.departed||'',v.status,v.date].join(',');
     })
   );
   var a = document.createElement('a');
@@ -535,6 +615,7 @@ function exportCSV() {
 /* ── Employee import ───────────────────────────────────── */
 function populateHostSelect() {
   var sel = document.getElementById('f-host');
+  if (!sel) return;
   var emps = loadE();
   sel.innerHTML = '<option value="">Select host...</option>';
   if (emps.length === 0) {
@@ -555,8 +636,8 @@ function populateHostSelect() {
 
 function renderEmpList() {
   var emps = loadE();
-  var list = document.getElementById('emp-list');
-  var status = document.getElementById('emp-status');
+  var list     = document.getElementById('emp-list');
+  var status   = document.getElementById('emp-status');
   var clearBtn = document.getElementById('btn-clear-emp');
   if (!list) return;
   if (emps.length === 0) { list.innerHTML = ''; clearBtn.style.display = 'none'; status.style.display = 'none'; return; }
@@ -564,11 +645,11 @@ function renderEmpList() {
   status.textContent = emps.length + ' employee' + (emps.length !== 1 ? 's' : '') + ' loaded';
   clearBtn.style.display = '';
   list.innerHTML = emps.slice(0, 60).map(function(e) {
-    var ini = (e.name || '?').split(' ').map(function(w) { return w[0] || ''; }).slice(0,2).join('').toUpperCase();
+    var ini = (e.name||'?').split(' ').map(function(w) { return w[0]||''; }).slice(0,2).join('').toUpperCase();
     return '<div class="emp-row"><div class="emp-av">' + ini + '</div>' +
       '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + esc(e.name) + '</div>' +
-      '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email || '') + (e.dept ? ' &middot; ' + esc(e.dept) : '') + '</div></div></div>';
-  }).join('') + (emps.length > 60 ? '<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and ' + (emps.length-60) + ' more</div>' : '');
+      '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email||'') + (e.dept ? ' &middot; '+esc(e.dept) : '') + '</div></div></div>';
+  }).join('') + (emps.length > 60 ? '<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and '+(emps.length-60)+' more</div>' : '');
 }
 
 function parseCSV(text) {
@@ -594,24 +675,90 @@ function parseCSV(text) {
     if (headers) {
       headers.forEach(function(h, i) {
         var v = cols[i] || '';
-        if (h === 'name' || h === 'full name' || h === 'fullname') name = v;
-        else if (h === 'first name' || h === 'firstname' || h === 'first') name = (name ? name + ' ' : '') + v;
-        else if (h === 'last name' || h === 'lastname' || h === 'surname' || h === 'last') name = (name ? name + ' ' : '') + v;
-        else if (h === 'email' || h === 'email address' || h === 'emailaddress') email = v;
-        else if (h === 'department' || h === 'dept' || h === 'team' || h === 'division') dept = v;
+        if (h==='name'||h==='full name'||h==='fullname') name = v;
+        else if (h==='first name'||h==='firstname'||h==='first') name = (name?name+' ':'')+v;
+        else if (h==='last name'||h==='lastname'||h==='surname'||h==='last') name = (name?name+' ':'')+v;
+        else if (h==='email'||h==='email address'||h==='emailaddress') email = v;
+        else if (h==='department'||h==='dept'||h==='team'||h==='division') dept = v;
       });
     } else {
-      name = cols[0] || ''; email = cols[1] || ''; dept = cols[2] || '';
+      name = cols[0]||''; email = cols[1]||''; dept = cols[2]||'';
     }
-    if (name) emps.push({name: name, email: email, dept: dept});
+    if (name) emps.push({name:name, email:email, dept:dept});
   });
   return emps;
+}
+
+/* ── Field settings ────────────────────────────────────── */
+function renderFieldSettings() {
+  var list = document.getElementById('field-settings-list');
+  if (!list) return;
+  var fields = getFields();
+
+  list.innerHTML = fields.map(function(f) {
+    var enabled   = fieldEnabled(f);
+    var isAlways  = f.alwaysOn;
+    var isMandatory = f.mandatory;
+
+    return '<div class="field-row" data-id="'+f.id+'" style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--br)">' +
+      '<div style="flex:1">' +
+        '<div style="font-size:14px;font-weight:500;color:var(--tx)">'+esc(f.label)+'</div>' +
+        (isAlways ? '<div style="font-size:11px;color:var(--tx3)">Always shown</div>' : '') +
+      '</div>' +
+      // Mandatory toggle
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">' +
+        '<div style="font-size:10px;color:var(--tx3);text-align:center">Required</div>' +
+        '<label class="tog" style="opacity:'+(isAlways||!enabled?'0.35':'1')+'">' +
+          '<input type="checkbox" class="req-chk" data-id="'+f.id+'" '+(isMandatory?'checked':'')+' '+(isAlways?'disabled':'')+'/>' +
+          '<span class="tog-sl req-color"></span>' +
+        '</label>' +
+      '</div>' +
+      // Enabled toggle
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">' +
+        '<div style="font-size:10px;color:var(--tx3);text-align:center">Show</div>' +
+        '<label class="tog" style="opacity:'+(isAlways?'0.35':'1')+'">' +
+          '<input type="checkbox" class="ena-chk" data-id="'+f.id+'" '+(enabled?'checked':'')+' '+(isAlways?'disabled':'')+'/>' +
+          '<span class="tog-sl"></span>' +
+        '</label>' +
+      '</div>' +
+    '</div>';
+  }).join('') +
+  '<p style="font-size:11px;color:var(--tx3);margin-top:10px">&#128274; Locked fields are always shown and required.</p>';
+
+  // Wire toggle events
+  list.querySelectorAll('.ena-chk').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      var id = this.getAttribute('data-id');
+      updateFieldConfig(id, 'enabled', this.checked);
+    });
+  });
+  list.querySelectorAll('.req-chk').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      var id = this.getAttribute('data-id');
+      updateFieldConfig(id, 'mandatory', this.checked);
+    });
+  });
+}
+
+function updateFieldConfig(id, prop, value) {
+  var fields = getFields();
+  var f = fields.find(function(x) { return x.id === id; });
+  if (!f) return;
+  // If disabling a field, also un-mandate it
+  if (prop === 'enabled' && !value) f.mandatory = false;
+  // If mandating a field, also enable it
+  if (prop === 'mandatory' && value) f.enabled = true;
+  f[prop] = value;
+  // Save only non-default values
+  var toSave = fields.map(function(x) { return {id:x.id, enabled:fieldEnabled(x), mandatory:x.mandatory}; });
+  saveF(toSave);
+  renderFieldSettings();
 }
 
 /* ── Init ──────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', function() {
 
-  // Home buttons
+  // Home
   document.getElementById('h-signin').addEventListener('click', function() { resetSi(); show('screen-signin'); });
   document.getElementById('h-signout').addEventListener('click', function() {
     document.getElementById('so-result').style.display = 'none';
@@ -621,7 +768,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   document.getElementById('h-admin').addEventListener('click', function() {
     pin = '';
-    [0,1,2,3].forEach(function(i) { document.getElementById('pd' + i).classList.remove('filled'); });
+    [0,1,2,3].forEach(function(i) { document.getElementById('pd'+i).classList.remove('filled'); });
     document.getElementById('admin-pin').style.display = 'flex';
     document.getElementById('admin-dash').style.display = 'none';
     show('screen-admin');
@@ -652,7 +799,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('dash-back').addEventListener('click', function() { show('screen-home'); });
   document.getElementById('log-q').addEventListener('input', renderLog);
   document.getElementById('tab-all').addEventListener('click', function() { setTab('all'); });
-  document.getElementById('tab-in').addEventListener('click', function() { setTab('in'); });
+  document.getElementById('tab-in').addEventListener('click',  function() { setTab('in');  });
   document.getElementById('tab-out').addEventListener('click', function() { setTab('out'); });
   document.getElementById('btn-export').addEventListener('click', exportCSV);
 
@@ -678,8 +825,15 @@ document.addEventListener('DOMContentLoaded', function() {
     renderEmpList(); populateHostSelect();
   });
 
+  // Field settings reset
+  document.getElementById('btn-reset-fields').addEventListener('click', function() {
+    if (!confirm('Reset all field settings to defaults?')) return;
+    localStorage.removeItem('igt_fields_v1');
+    renderFieldSettings();
+  });
+
   // Init
-  populateHostSelect();
+  buildSignInForm();
   renderEmpList();
   show('screen-home');
 });
