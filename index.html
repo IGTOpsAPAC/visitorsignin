@@ -1,745 +1,347 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <title>VisitorFlow</title>
-<meta name="description" content="Office visitor sign-in system" />
-
-<!-- PWA meta tags -->
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="VisitorFlow" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="theme-color" content="#7F77DD" />
-<link rel="manifest" href="manifest.json" />
-
-<!-- Apple touch icons (inline SVG data URI) -->
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%237F77DD'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle' fill='white' font-family='system-ui'%3E%F0%9F%8F%A2%3C/text%3E%3C/svg%3E" />
-
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="VisitorFlow"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#7F77DD"/>
 <style>
-  :root {
-    --purple: #7F77DD;
-    --purple-dark: #534AB7;
-    --purple-light: #EEEDFE;
-    --green: #639922;
-    --green-light: #EAF3DE;
-    --green-dark: #3B6D11;
-    --blue: #378ADD;
-    --blue-light: #E6F1FB;
-    --blue-dark: #0C447C;
-    --red: #E24B4A;
-    --red-light: #FCEBEB;
-    --red-dark: #A32D2D;
-    --amber: #BA7517;
-    --amber-light: #FAEEDA;
-    --gray: #888780;
-    --gray-light: #F1EFE8;
-    --bg: #ffffff;
-    --bg2: #f8f7f5;
-    --bg3: #f1efe8;
-    --text: #1a1a18;
-    --text2: #5f5e5a;
-    --text3: #888780;
-    --border: rgba(0,0,0,0.12);
-    --border2: rgba(0,0,0,0.20);
-    --radius: 10px;
-    --radius-lg: 14px;
-    --shadow: 0 2px 12px rgba(0,0,0,0.08);
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1c1c1e; --bg2: #2c2c2e; --bg3: #3a3a3c;
-      --text: #f2f2f7; --text2: #aeaeb2; --text3: #636366;
-      --border: rgba(255,255,255,0.12); --border2: rgba(255,255,255,0.22);
-      --purple-light: #26215C; --green-light: #173404; --blue-light: #042C53; --red-light: #501313; --amber-light: #412402;
-    }
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg3); color: var(--text); }
-
-  /* App shell */
-  #app { display: flex; height: 100%; flex-direction: column; }
-
-  /* Top bar */
-  .topbar {
-    background: var(--bg);
-    border-bottom: 0.5px solid var(--border);
-    padding: calc(var(--safe-top) + 12px) 16px 12px;
-    display: flex; align-items: center; justify-content: space-between;
-    flex-shrink: 0; z-index: 10;
-  }
-  .topbar-title { font-size: 17px; font-weight: 600; color: var(--text); }
-  .topbar-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
-  .topbar-action { background: var(--purple); color: white; border: none; border-radius: 20px; padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-
-  /* Bottom nav */
-  .bottomnav {
-    background: var(--bg); border-top: 0.5px solid var(--border);
-    display: flex; padding-bottom: var(--safe-bottom);
-    flex-shrink: 0;
-  }
-  .nav-btn {
-    flex: 1; display: flex; flex-direction: column; align-items: center;
-    padding: 10px 4px 8px; border: none; background: none; cursor: pointer;
-    color: var(--text3); font-size: 10px; gap: 3px;
-  }
-  .nav-btn.active { color: var(--purple); }
-  .nav-btn svg { width: 24px; height: 24px; stroke-width: 1.75; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
-
-  /* Scroll content */
-  .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-
-  /* Views */
-  .view { display: none; padding: 16px; }
-  .view.active { display: block; }
-
-  /* Cards */
-  .card { background: var(--bg); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
-  .card-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-
-  /* Metrics grid */
-  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .metric { background: var(--bg); border-radius: var(--radius-lg); padding: 14px; box-shadow: var(--shadow); }
-  .metric-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; font-weight: 500; }
-  .metric-value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
-  .metric-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 4px; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  /* Visitor rows */
-  .visitor-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
-  .visitor-row:last-child { border-bottom: none; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
-  .visitor-info { flex: 1; min-width: 0; }
-  .visitor-name { font-size: 15px; font-weight: 500; color: var(--text); }
-  .visitor-meta { font-size: 12px; color: var(--text3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-  .badge-in { background: var(--green-light); color: var(--green-dark); }
-  .badge-out { background: var(--gray-light); color: var(--gray); }
-  .sign-out-btn { background: var(--red-light); color: var(--red-dark); border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
-
-  /* Form styles */
-  .form-section { margin-bottom: 20px; }
-  .form-section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 5px; }
-  .field input, .field select, .field textarea {
-    width: 100%; padding: 12px 14px; border: 1px solid var(--border2);
-    border-radius: var(--radius); background: var(--bg); color: var(--text);
-    font-size: 16px; font-family: inherit; appearance: none; -webkit-appearance: none;
-  }
-  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(127,119,221,0.15); }
-  .field textarea { height: 80px; resize: none; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-  /* Photo capture box */
-  .photo-capture { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; }
-  .photo-capture.done { border-color: var(--green); background: var(--green-light); }
-  .photo-capture-icon { font-size: 32px; margin-bottom: 6px; }
-  .photo-capture-text { font-size: 13px; color: var(--text3); }
-
-  /* Agreement */
-  .agreement-text { background: var(--bg2); border-radius: var(--radius); padding: 12px; font-size: 13px; color: var(--text2); line-height: 1.6; max-height: 100px; overflow-y: auto; margin-bottom: 12px; }
-  .check-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
-  .check-row input[type=checkbox] { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--purple); cursor: pointer; flex-shrink: 0; }
-  .check-row label { font-size: 14px; color: var(--text); line-height: 1.4; cursor: pointer; }
-
-  /* Signature canvas */
-  #sig-canvas { width: 100%; height: 100px; border: 1px solid var(--border2); border-radius: var(--radius); background: var(--bg); touch-action: none; display: block; }
-
-  /* Steps */
-  .steps { display: flex; gap: 0; margin-bottom: 20px; }
-  .step { flex: 1; text-align: center; font-size: 11px; padding-bottom: 8px; border-bottom: 2.5px solid var(--border); color: var(--text3); font-weight: 500; }
-  .step.done { color: var(--green); border-color: var(--green); }
-  .step.current { color: var(--purple); border-color: var(--purple); }
-
-  /* Primary button */
-  .btn-primary { width: 100%; background: var(--purple); color: white; border: none; border-radius: var(--radius); padding: 15px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
-  .btn-primary:active { background: var(--purple-dark); transform: scale(0.99); }
-  .btn-secondary { width: 100%; background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; font-size: 15px; font-weight: 500; cursor: pointer; margin-top: 8px; }
-  .btn-danger { background: var(--red); }
-  .btn-success { background: var(--green); }
-
-  /* Success screen */
-  .success-wrap { text-align: center; padding: 20px 0; }
-  .success-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--green-light); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 30px; }
-  .success-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-  .success-meta { font-size: 14px; color: var(--text3); margin-bottom: 20px; }
-  .notif-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg2); border-radius: var(--radius); margin-bottom: 8px; font-size: 13px; color: var(--text2); }
-
-  /* Badge */
-  .badge-card { background: var(--blue-light); border: 1px solid rgba(55,138,221,0.3); border-radius: var(--radius-lg); padding: 20px; text-align: center; }
-  .badge-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--blue); text-transform: uppercase; }
-  .badge-visitor-name { font-size: 22px; font-weight: 700; color: var(--blue-dark); margin: 6px 0 2px; }
-  .badge-company { font-size: 13px; color: var(--blue); margin-bottom: 10px; }
-  .badge-id { font-size: 26px; font-weight: 700; letter-spacing: 4px; color: var(--blue-dark); margin: 8px 0; }
-  .badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; text-align: left; }
-  .badge-field { font-size: 11px; }
-  .badge-field-label { color: var(--blue); opacity: 0.7; display: block; }
-  .badge-field-value { font-weight: 600; color: var(--blue-dark); font-size: 12px; }
-  .badge-footer { font-size: 10px; color: var(--blue); opacity: 0.6; margin-top: 12px; padding-top: 10px; border-top: 0.5px solid rgba(55,138,221,0.2); }
-
-  /* Log search */
-  .search-bar { background: var(--bg2); border-radius: var(--radius); padding: 10px 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-  .search-bar input { flex: 1; border: none; background: none; font-size: 15px; color: var(--text); outline: none; font-family: inherit; }
-  .chips { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-  .chip { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); color: var(--text2); background: var(--bg); cursor: pointer; }
-  .chip.active { background: var(--purple-light); color: var(--purple-dark); border-color: var(--purple); }
-
-  /* Install banner */
-  #install-banner { background: var(--purple); color: white; padding: calc(var(--safe-top) + 10px) 16px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; flex-shrink: 0; }
-  #install-banner b { display: block; font-size: 14px; }
-  .install-btn { background: white; color: var(--purple-dark); border: none; border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
-  .dismiss-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; opacity: 0.7; padding: 0 4px; }
-
-  /* Offline indicator */
-  #offline-bar { background: var(--amber-light); color: var(--amber); padding: 8px 16px; font-size: 13px; text-align: center; display: none; flex-shrink: 0; }
-
-  .empty-state { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 14px; }
-  .empty-icon { font-size: 40px; margin-bottom: 8px; }
-
-  @media print {
-    body * { visibility: hidden; }
-    .badge-card, .badge-card * { visibility: visible; }
-    .badge-card { position: fixed; top: 0; left: 0; width: 100%; }
-  }
+:root{--p:#7F77DD;--pd:#534AB7;--pl:#EEEDFE;--g:#639922;--gl:#EAF3DE;--gd:#3B6D11;--bl:#E6F1FB;--bd:#0C447C;--rl:#FCEBEB;--rd:#A32D2D;--al:#FAEEDA;--gray:#F1EFE8;--bg:#fff;--bg2:#f8f7f5;--bg3:#f1efe8;--tx:#1a1a18;--tx2:#5f5e5a;--tx3:#888780;--br:rgba(0,0,0,0.12);--br2:rgba(0,0,0,0.20);--r:10px;--rl2:14px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;--tx:#f2f2f7;--tx2:#aeaeb2;--tx3:#636366;--br:rgba(255,255,255,0.12);--br2:rgba(255,255,255,0.22);--pl:#26215C;--gl:#173404;--bl:#042C53;--rl:#501313;--al:#412402}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg3);color:var(--tx)}
+#app{display:flex;height:100%;flex-direction:column}
+.topbar{background:var(--bg);border-bottom:0.5px solid var(--br);padding:calc(var(--st) + 12px) 16px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:10}
+.topbar-title{font-size:17px;font-weight:600;color:var(--tx)}
+.topbar-sub{font-size:12px;color:var(--tx3);margin-top:1px}
+#topbar-btn{background:var(--p);color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer}
+.bottomnav{background:var(--bg);border-top:0.5px solid var(--br);display:flex;padding-bottom:var(--sb);flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px 8px;border:none;background:none;cursor:pointer;color:var(--tx3);font-size:10px;gap:3px}
+.nav-btn.active{color:var(--p)}
+.nav-btn svg{width:24px;height:24px;stroke-width:1.75;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.view{display:none;padding:16px}
+.view.active{display:block}
+.card{background:var(--bg);border-radius:var(--rl2);padding:16px;margin-bottom:12px;box-shadow:0 2px 12px rgba(0,0,0,0.07)}
+.card-title{font-size:13px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.metric{background:var(--bg);border-radius:var(--rl2);padding:14px;box-shadow:0 2px 12px rgba(0,0,0,0.07)}
+.metric-label{font-size:11px;color:var(--tx3);margin-bottom:4px;font-weight:500}
+.metric-value{font-size:28px;font-weight:700;color:var(--tx);line-height:1}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--g);margin-right:4px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.vrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--br)}
+.vrow:last-child{border-bottom:none}
+.av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+.vinfo{flex:1;min-width:0}
+.vname{font-size:15px;font-weight:500;color:var(--tx)}
+.vmeta{font-size:12px;color:var(--tx3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge-in{background:var(--gl);color:var(--gd);display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-out{background:var(--gray);color:var(--tx3);display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.sout-btn{background:var(--rl);color:var(--rd);border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--br2);border-radius:var(--r);background:var(--bg);color:var(--tx);font-size:16px;font-family:inherit;appearance:none;-webkit-appearance:none}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(127,119,221,0.15)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.photo-box{border:1.5px dashed var(--br2);border-radius:var(--r);padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.2s}
+.photo-box.done{border-color:var(--g);background:var(--gl)}
+.photo-icon{font-size:32px;margin-bottom:6px}
+.photo-text{font-size:13px;color:var(--tx3)}
+.agree-text{background:var(--bg2);border-radius:var(--r);padding:12px;font-size:13px;color:var(--tx2);line-height:1.6;max-height:100px;overflow-y:auto;margin-bottom:12px}
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.check-row input[type=checkbox]{width:20px;height:20px;margin-top:1px;accent-color:var(--p);cursor:pointer;flex-shrink:0}
+.check-row label{font-size:14px;color:var(--tx);line-height:1.4;cursor:pointer}
+#sig-canvas{width:100%;height:100px;border:1px solid var(--br2);border-radius:var(--r);background:var(--bg);touch-action:none;display:block}
+.steps{display:flex;margin-bottom:20px}
+.step{flex:1;text-align:center;font-size:11px;padding-bottom:8px;border-bottom:2.5px solid var(--br);color:var(--tx3);font-weight:500}
+.step.done{color:var(--g);border-color:var(--g)}
+.step.current{color:var(--p);border-color:var(--p)}
+.btn-p{width:100%;background:var(--p);color:#fff;border:none;border-radius:var(--r);padding:15px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}
+.btn-s{width:100%;background:var(--bg2);color:var(--tx);border:1px solid var(--br);border-radius:var(--r);padding:14px;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px}
+.btn-ok{background:var(--g)!important}
+.success-wrap{text-align:center;padding:20px 0}
+.success-icon{width:64px;height:64px;border-radius:50%;background:var(--gl);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:30px}
+.success-name{font-size:20px;font-weight:700;margin-bottom:4px}
+.success-meta{font-size:14px;color:var(--tx3);margin-bottom:20px}
+.notif-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-radius:var(--r);margin-bottom:8px;font-size:13px;color:var(--tx2)}
+.badge-card{background:var(--bl);border:1px solid rgba(55,138,221,0.3);border-radius:var(--rl2);padding:20px;text-align:center}
+.badge-lbl{font-size:10px;font-weight:700;letter-spacing:2px;color:#378ADD;text-transform:uppercase}
+.badge-vname{font-size:22px;font-weight:700;color:var(--bd);margin:6px 0 2px}
+.badge-co{font-size:13px;color:#378ADD;margin-bottom:10px}
+.badge-id{font-size:26px;font-weight:700;letter-spacing:4px;color:var(--bd);margin:8px 0}
+.badge-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;text-align:left}
+.bf-label{font-size:11px;color:#378ADD;opacity:0.7;display:block}
+.bf-value{font-weight:600;color:var(--bd);font-size:12px}
+.badge-footer{font-size:10px;color:#378ADD;opacity:0.6;margin-top:12px;padding-top:10px;border-top:0.5px solid rgba(55,138,221,0.2)}
+.search-bar{background:var(--bg2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.search-bar input{flex:1;border:none;background:none;font-size:15px;color:var(--tx);outline:none;font-family:inherit}
+.chips{display:flex;gap:6px;margin-bottom:12px}
+.chip{padding:5px 14px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--br);color:var(--tx2);background:var(--bg);cursor:pointer}
+.chip.active{background:var(--pl);color:var(--pd);border-color:var(--p)}
+.empty{text-align:center;padding:40px 20px;color:var(--tx3);font-size:14px}
+.empty-icon{font-size:40px;margin-bottom:8px}
+#offline-bar{background:var(--al);color:#BA7517;padding:8px 16px;font-size:13px;text-align:center;display:none;flex-shrink:0}
+@media print{body *{visibility:hidden}.badge-card,.badge-card *{visibility:visible}.badge-card{position:fixed;top:0;left:0;width:100%}}
 </style>
 </head>
 <body>
-
 <div id="app">
-  <!-- Offline bar -->
-  <div id="offline-bar">⚠️ You're offline — data is saved locally</div>
-
-  <!-- Install banner (shown on eligible browsers) -->
-  <div id="install-banner" style="display:none">
-    <div><b>Install VisitorFlow</b>Add to Home Screen for full-screen use</div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="install-btn" id="install-btn">Install</button>
-      <button class="dismiss-btn" onclick="dismissBanner()">✕</button>
-    </div>
-  </div>
-
-  <!-- Top bar -->
+  <div id="offline-bar">You are offline — data is saved locally</div>
   <div class="topbar">
-    <div>
-      <div class="topbar-title" id="topbar-title">Dashboard</div>
-      <div class="topbar-sub" id="topbar-sub">VisitorFlow</div>
-    </div>
-    <button class="topbar-action" id="topbar-btn" onclick="handleTopbarAction()">
-      <span>＋</span> New visitor
-    </button>
+    <div><div class="topbar-title" id="topbar-title">Dashboard</div><div class="topbar-sub">VisitorFlow</div></div>
+    <button id="topbar-btn">+ New visitor</button>
   </div>
-
-  <!-- Scrollable content -->
   <div class="content" id="content">
-
-    <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
       <div class="metrics">
-        <div class="metric">
-          <div class="metric-label"><span class="metric-dot"></span>On site now</div>
-          <div class="metric-value" id="m-onsite">0</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Today total</div>
-          <div class="metric-value" id="m-today">0</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Signed out</div>
-          <div class="metric-value" id="m-out">0</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">This week</div>
-          <div class="metric-value" id="m-week">0</div>
-        </div>
+        <div class="metric"><div class="metric-label"><span class="dot"></span>On site now</div><div class="metric-value" id="m-onsite">0</div></div>
+        <div class="metric"><div class="metric-label">Today total</div><div class="metric-value" id="m-today">0</div></div>
+        <div class="metric"><div class="metric-label">Signed out</div><div class="metric-value" id="m-out">0</div></div>
+        <div class="metric"><div class="metric-label">This week</div><div class="metric-value" id="m-week">0</div></div>
       </div>
-      <div class="card">
-        <div class="card-title">Currently on site</div>
-        <div id="live-list"></div>
-      </div>
+      <div class="card"><div class="card-title">Currently on site</div><div id="live-list"></div></div>
     </div>
-
-    <!-- SIGN IN - step 1 -->
     <div class="view" id="view-signin">
-      <div class="steps" id="step-dots">
-        <div class="step current">Details</div>
-        <div class="step">Photo & ID</div>
-        <div class="step">Agreement</div>
-        <div class="step">Done</div>
-      </div>
-
+      <div class="steps"><div class="step current">Details</div><div class="step">Photo &amp; ID</div><div class="step">Agreement</div><div class="step">Done</div></div>
       <div id="s1">
         <div class="card">
-          <div class="form-section-title">Visitor details</div>
+          <div class="card-title">Visitor details</div>
           <div class="row2">
-            <div class="field"><label>First name</label><input id="f-first" type="text" placeholder="Jane" autocomplete="given-name" /></div>
-            <div class="field"><label>Last name</label><input id="f-last" type="text" placeholder="Smith" autocomplete="family-name" /></div>
+            <div class="field"><label>First name</label><input id="f-first" type="text" placeholder="Jane" autocomplete="given-name"/></div>
+            <div class="field"><label>Last name</label><input id="f-last" type="text" placeholder="Smith" autocomplete="family-name"/></div>
           </div>
-          <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="jane@company.com" autocomplete="email" /></div>
-          <div class="field"><label>Phone (optional)</label><input id="f-phone" type="tel" placeholder="+61 4xx xxx xxx" autocomplete="tel" /></div>
-          <div class="field"><label>Company (optional)</label><input id="f-company" type="text" placeholder="Acme Corp" autocomplete="organization" /></div>
+          <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="jane@company.com" autocomplete="email"/></div>
+          <div class="field"><label>Phone (optional)</label><input id="f-phone" type="tel" placeholder="+61 4xx xxx xxx" autocomplete="tel"/></div>
+          <div class="field"><label>Company (optional)</label><input id="f-company" type="text" placeholder="Acme Corp" autocomplete="organization"/></div>
           <div class="field"><label>Host / person visiting</label>
-            <select id="f-host">
-              <option value="">Select host...</option>
-              <option>Alex Chen – Engineering</option>
-              <option>Sarah Park – HR</option>
-              <option>Marcus Webb – Finance</option>
-              <option>Priya Nair – Legal</option>
-              <option>Tom Ellison – CEO</option>
-            </select>
+            <select id="f-host"><option value="">Select host...</option><option>Alex Chen - Engineering</option><option>Sarah Park - HR</option><option>Marcus Webb - Finance</option><option>Priya Nair - Legal</option><option>Tom Ellison - CEO</option></select>
           </div>
           <div class="field"><label>Purpose of visit</label>
-            <select id="f-purpose">
-              <option value="">Select purpose...</option>
-              <option>Meeting / interview</option>
-              <option>Delivery / contractor</option>
-              <option>Client visit</option>
-              <option>Building maintenance</option>
-              <option>Other</option>
-            </select>
+            <select id="f-purpose"><option value="">Select purpose...</option><option>Meeting / interview</option><option>Delivery / contractor</option><option>Client visit</option><option>Building maintenance</option><option>Other</option></select>
           </div>
         </div>
-        <button class="btn-primary" onclick="goStep(2)">Continue →</button>
+        <button class="btn-p" id="btn-s1-next">Continue</button>
       </div>
-
       <div id="s2" style="display:none">
         <div class="card">
-          <div class="form-section-title">Photo & ID</div>
-          <div class="field"><label>Visitor photo</label>
-            <div class="photo-capture" id="photo-box" onclick="capturePhoto()">
-              <div class="photo-capture-icon" id="photo-icon">📷</div>
-              <div class="photo-capture-text" id="photo-text">Tap to capture photo</div>
-            </div>
-          </div>
-          <div class="field"><label>ID document</label>
-            <div class="photo-capture" id="id-box" onclick="captureId()">
-              <div class="photo-capture-icon" id="id-icon">🪪</div>
-              <div class="photo-capture-text" id="id-text">Tap to scan ID</div>
-            </div>
-          </div>
-          <div class="field"><label>ID type</label>
-            <select id="f-id-type">
-              <option>Driver's licence</option>
-              <option>Passport</option>
-              <option>Employee / student card</option>
-              <option>Other government ID</option>
-            </select>
-          </div>
+          <div class="card-title">Photo &amp; ID</div>
+          <div class="field"><label>Visitor photo</label><div class="photo-box" id="photo-box"><div class="photo-icon" id="photo-icon">&#128247;</div><div class="photo-text" id="photo-text">Tap to capture photo</div></div></div>
+          <div class="field"><label>ID document</label><div class="photo-box" id="id-box"><div class="photo-icon" id="id-icon">&#129482;</div><div class="photo-text" id="id-text">Tap to scan ID</div></div></div>
+          <div class="field"><label>ID type</label><select id="f-id-type"><option>Driver's licence</option><option>Passport</option><option>Employee / student card</option><option>Other government ID</option></select></div>
         </div>
-        <button class="btn-primary" onclick="goStep(3)">Continue →</button>
-        <button class="btn-secondary" onclick="goStep(1)">← Back</button>
+        <button class="btn-p" id="btn-s2-next">Continue</button>
+        <button class="btn-s" id="btn-s2-back">Back</button>
       </div>
-
       <div id="s3" style="display:none">
         <div class="card">
-          <div class="form-section-title">Visitor agreement</div>
-          <div class="agreement-text">As a visitor to these premises, you agree to: follow all safety and security instructions; not access restricted areas; keep all information observed confidential; not photograph or record without prior permission; carry your visitor badge at all times; sign out before leaving; comply with all reasonable requests from staff. Entry may be refused or revoked at any time.</div>
-          <div class="check-row"><input type="checkbox" id="agree1" /><label for="agree1">I have read and agree to the visitor policy and all site rules</label></div>
-          <div class="check-row"><input type="checkbox" id="agree2" /><label for="agree2">I consent to photo capture for security and verification purposes</label></div>
-          <div class="field" style="margin-top:14px">
-            <label>Signature</label>
-            <canvas id="sig-canvas"></canvas>
-            <button class="btn-secondary" style="margin-top:6px;padding:8px" onclick="clearSig()">Clear signature</button>
-          </div>
+          <div class="card-title">Visitor agreement</div>
+          <div class="agree-text">As a visitor to these premises, you agree to: follow all safety and security instructions; not access restricted areas; keep all information observed confidential; not photograph or record without prior permission; carry your visitor badge at all times; sign out before leaving; comply with all reasonable requests from staff. Entry may be refused or revoked at any time.</div>
+          <div class="check-row"><input type="checkbox" id="agree1"/><label for="agree1">I have read and agree to the visitor policy and all site rules</label></div>
+          <div class="check-row"><input type="checkbox" id="agree2"/><label for="agree2">I consent to photo capture for security and verification purposes</label></div>
+          <div class="field" style="margin-top:14px"><label>Signature</label><canvas id="sig-canvas"></canvas><button class="btn-s" id="btn-clear-sig" style="margin-top:6px;padding:8px">Clear signature</button></div>
         </div>
-        <button class="btn-primary btn-success" onclick="completeSignIn()">✓ Complete sign-in</button>
-        <button class="btn-secondary" onclick="goStep(2)">← Back</button>
+        <button class="btn-p btn-ok" id="btn-complete">Complete sign-in</button>
+        <button class="btn-s" id="btn-s3-back">Back</button>
       </div>
-
       <div id="s4" style="display:none">
         <div class="card">
           <div class="success-wrap">
-            <div class="success-icon">✓</div>
-            <div class="success-name" id="success-name">Jane Smith</div>
-            <div class="success-meta" id="success-meta">Signed in successfully</div>
-            <div class="notif-row">📧 Email notification sent to host</div>
-            <div class="notif-row">💬 SMS notification sent to host</div>
-            <button class="btn-primary" onclick="printBadge()" style="margin-top:16px">🖨 Print badge</button>
-            <button class="btn-secondary" onclick="resetForm()">+ New visitor</button>
+            <div class="success-icon">&#10003;</div>
+            <div class="success-name" id="success-name">Signed in</div>
+            <div class="success-meta" id="success-meta">Successfully checked in</div>
+            <div class="notif-row">&#128231; Email notification sent to host</div>
+            <div class="notif-row">&#128172; SMS notification sent to host</div>
+            <button class="btn-p" id="btn-print-s4" style="margin-top:16px">Print badge</button>
+            <button class="btn-s" id="btn-new-visitor">+ New visitor</button>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- LOG VIEW -->
     <div class="view" id="view-log">
-      <div class="search-bar">
-        <span style="color:var(--text3)">🔍</span>
-        <input type="text" placeholder="Search visitors..." id="log-search" oninput="renderLog()" />
-      </div>
-      <div class="chips" id="log-chips">
-        <div class="chip active" onclick="setFilter('all',this)">All</div>
-        <div class="chip" onclick="setFilter('in',this)">On site</div>
-        <div class="chip" onclick="setFilter('out',this)">Signed out</div>
-      </div>
+      <div class="search-bar"><span style="color:var(--tx3)">&#128269;</span><input type="text" placeholder="Search visitors..." id="log-search"/></div>
+      <div class="chips"><div class="chip active" id="chip-all">All</div><div class="chip" id="chip-in">On site</div><div class="chip" id="chip-out">Signed out</div></div>
       <div id="log-list"></div>
-      <button class="btn-secondary" onclick="exportCSV()" style="margin-top:4px">⬇ Export CSV</button>
+      <button class="btn-s" id="btn-export" style="margin-top:4px">Export CSV</button>
     </div>
-
-    <!-- BADGE VIEW -->
     <div class="view" id="view-badge">
-      <div class="badge-card" id="badge-card">
-        <div class="badge-label">Visitor pass</div>
-        <div class="badge-visitor-name" id="b-name">Jane Smith</div>
-        <div class="badge-company" id="b-company">Acme Corp</div>
+      <div class="badge-card">
+        <div class="badge-lbl">Visitor pass</div>
+        <div class="badge-vname" id="b-name">Jane Smith</div>
+        <div class="badge-co" id="b-company">Acme Corp</div>
         <div class="badge-id" id="b-id">VIS-0001</div>
         <div class="badge-grid">
-          <div class="badge-field"><span class="badge-field-label">Host</span><span class="badge-field-value" id="b-host">Alex Chen</span></div>
-          <div class="badge-field"><span class="badge-field-label">Date</span><span class="badge-field-value" id="b-date">—</span></div>
-          <div class="badge-field"><span class="badge-field-label">Purpose</span><span class="badge-field-value" id="b-purpose">Meeting</span></div>
-          <div class="badge-field"><span class="badge-field-label">Expires</span><span class="badge-field-value" id="b-expires">18:00</span></div>
+          <div><span class="bf-label">Host</span><span class="bf-value" id="b-host">Alex Chen</span></div>
+          <div><span class="bf-label">Date</span><span class="bf-value" id="b-date">-</span></div>
+          <div><span class="bf-label">Purpose</span><span class="bf-value" id="b-purpose">Meeting</span></div>
+          <div><span class="bf-label">Expires</span><span class="bf-value" id="b-expires">18:00</span></div>
         </div>
-        <div class="badge-footer">Must be worn visibly at all times · Sign out before leaving</div>
+        <div class="badge-footer">Must be worn visibly at all times - Sign out before leaving</div>
       </div>
-      <button class="btn-primary" onclick="window.print()" style="margin-top:12px">🖨 Print badge</button>
-      <button class="btn-secondary" onclick="shareVisitorCard()">Share visitor card</button>
+      <button class="btn-p" id="btn-print-badge" style="margin-top:12px">Print badge</button>
     </div>
-
   </div>
-
-  <!-- Bottom nav -->
   <div class="bottomnav">
-    <button class="nav-btn active" onclick="showView('dashboard',this)" id="nav-dashboard">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Dashboard
-    </button>
-    <button class="nav-btn" onclick="showView('signin',this)" id="nav-signin">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M18 9l2 2 4-4" transform="translate(-4,-2)"/></svg>
-      Sign in
-    </button>
-    <button class="nav-btn" onclick="showView('log',this)" id="nav-log">
-      <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-      Log
-    </button>
-    <button class="nav-btn" onclick="showView('badge',this)" id="nav-badge">
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 9h2M15 13h2M7 17h10"/></svg>
-      Badge
-    </button>
+    <button class="nav-btn active" id="nav-dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</button>
+    <button class="nav-btn" id="nav-signin"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Sign in</button>
+    <button class="nav-btn" id="nav-log"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>Log</button>
+    <button class="nav-btn" id="nav-badge"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 9h2M15 13h2M7 17h10"/></svg>Badge</button>
   </div>
 </div>
-
 <script>
-// ─── Data store (localStorage for offline persistence) ───────────────────────
-const DB_KEY = 'visitorflow_v1';
-
-function loadData() {
-  try {
-    const d = localStorage.getItem(DB_KEY);
-    return d ? JSON.parse(d) : { visitors: [], nextId: 1 };
-  } catch { return { visitors: [], nextId: 1 }; }
+(function(){
+var DB='vf_v3';
+function load(){try{var d=localStorage.getItem(DB);return d?JSON.parse(d):{visitors:[],nextId:1}}catch(e){return{visitors:[],nextId:1}}}
+function save(db){try{localStorage.setItem(DB,JSON.stringify(db))}catch(e){}}
+var db=load();
+if(db.visitors.length===0){
+  var td=new Date().toDateString();
+  var CP=[['#EEEDFE','#3C3489'],['#E1F5EE','#085041'],['#E6F1FB','#0C447C'],['#FAEEDA','#633806'],['#FAECE7','#712B13']];
+  [{first:'Jane',last:'Smith',company:'Acme Corp',host:'Alex Chen',purpose:'Meeting / interview',arrived:'08:54',departed:null,status:'in'},
+   {first:'Rahul',last:'Gupta',company:'TechVen',host:'Sarah Park',purpose:'Client visit',arrived:'09:12',departed:null,status:'in'},
+   {first:'Claire',last:'Moreau',company:'',host:'Tom Ellison',purpose:'Meeting / interview',arrived:'09:30',departed:null,status:'in'},
+   {first:'Nina',last:'Torres',company:'Zenith',host:'Priya Nair',purpose:'Client visit',arrived:'07:15',departed:'08:50',status:'out'},
+   {first:'James',last:'Lee',company:'',host:'Alex Chen',purpose:'Delivery / contractor',arrived:'06:55',departed:'07:30',status:'out'}
+  ].forEach(function(s,i){s.id='VIS-'+String(db.nextId++).padStart(4,'0');s.cbg=CP[i][0];s.cfg=CP[i][1];s.ini=(s.first[0]+s.last[0]).toUpperCase();s.date=td;db.visitors.push(s)});
+  save(db);
 }
-
-function saveData(db) {
-  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {}
+var CPairs=[['#EEEDFE','#3C3489'],['#E1F5EE','#085041'],['#E6F1FB','#0C447C'],['#FAEEDA','#633806'],['#FAECE7','#712B13']];
+var cpIdx=0;
+function av(v,sz){sz=sz||40;return '<div class="av" style="width:'+sz+'px;height:'+sz+'px;background:'+v.cbg+';color:'+v.cfg+';font-size:'+(Math.round(sz*0.33))+'px">'+v.ini+'</div>'}
+function ts(){var n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function renderDash(){
+  var td=new Date().toDateString();
+  var on=db.visitors.filter(function(v){return v.status==='in'});
+  document.getElementById('m-onsite').textContent=on.length;
+  document.getElementById('m-today').textContent=db.visitors.filter(function(v){return v.date===td}).length;
+  document.getElementById('m-out').textContent=db.visitors.filter(function(v){return v.status==='out'&&v.date===td}).length;
+  document.getElementById('m-week').textContent=db.visitors.length;
+  var ll=document.getElementById('live-list');
+  if(!on.length){ll.innerHTML='<div class="empty"><div class="empty-icon">&#127962;</div>No visitors currently on site</div>';return}
+  ll.innerHTML=on.map(function(v){return '<div class="vrow">'+av(v)+'<div class="vinfo"><div class="vname">'+esc(v.first)+' '+esc(v.last)+'</div><div class="vmeta">'+esc(v.host)+' &middot; '+esc(v.arrived)+'</div></div><button class="sout-btn" data-id="'+v.id+'">Sign out</button></div>'}).join('');
+  ll.querySelectorAll('.sout-btn').forEach(function(b){b.addEventListener('click',function(){signOut(this.getAttribute('data-id'))})});
 }
-
-let db = loadData();
-
-// Seed sample data on first run
-if (db.visitors.length === 0) {
-  const today = new Date();
-  const fmt = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-  const samples = [
-    { first:'Jane', last:'Smith', company:'Acme Corp', email:'jane@acme.com', phone:'', host:'Alex Chen', purpose:'Meeting / interview', arrived: fmt(8,54), departed:null, status:'in', date: today.toDateString() },
-    { first:'Rahul', last:'Gupta', company:'TechVen', email:'r@tv.io', phone:'', host:'Sarah Park', purpose:'Client visit', arrived: fmt(9,12), departed:null, status:'in', date: today.toDateString() },
-    { first:'Claire', last:'Moreau', company:'', email:'claire@gmail.com', phone:'', host:'Tom Ellison', purpose:'Meeting / interview', arrived: fmt(9,30), departed:null, status:'in', date: today.toDateString() },
-    { first:'Nina', last:'Torres', company:'Zenith', email:'', phone:'', host:'Priya Nair', purpose:'Client visit', arrived: fmt(7,15), departed: fmt(8,50), status:'out', date: today.toDateString() },
-    { first:'James', last:'Lee', company:'', email:'', phone:'', host:'Alex Chen', purpose:'Delivery / contractor', arrived: fmt(6,55), departed: fmt(7,30), status:'out', date: today.toDateString() },
-  ];
-  const colors = [['#EEEDFE','#3C3489'],['#E1F5EE','#085041'],['#E6F1FB','#0C447C'],['#FAEEDA','#633806'],['#FAECE7','#712B13']];
-  samples.forEach((s, i) => {
-    s.id = 'VIS-' + String(db.nextId++).padStart(4,'0');
-    s.colorBg = colors[i % 5][0];
-    s.colorFg = colors[i % 5][1];
-    s.initials = s.first[0] + s.last[0];
-    db.visitors.push(s);
+function signOut(id){
+  var v=db.visitors.find(function(x){return x.id===id});
+  if(!v)return;v.status='out';v.departed=ts();save(db);renderDash();renderLog();
+}
+var lf='all';
+function renderLog(){
+  var q=(document.getElementById('log-search').value||'').toLowerCase();
+  var rows=db.visitors.filter(function(v){
+    var m=(v.first+' '+v.last+' '+(v.company||'')+' '+v.host+' '+v.purpose).toLowerCase().indexOf(q)>=0;
+    if(lf==='in')return m&&v.status==='in';if(lf==='out')return m&&v.status==='out';return m;
   });
-  saveData(db);
+  var ll=document.getElementById('log-list');
+  if(!rows.length){ll.innerHTML='<div class="empty"><div class="empty-icon">&#128269;</div>No visitors found</div>';return}
+  ll.innerHTML=rows.map(function(v){return '<div class="card" style="margin-bottom:8px;padding:12px"><div style="display:flex;align-items:center;gap:10px">'+av(v,36)+'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:500">'+esc(v.first)+' '+esc(v.last)+' <span style="font-size:11px;color:var(--tx3)">'+v.id+'</span></div><div style="font-size:12px;color:var(--tx3)">'+esc(v.host)+' &middot; '+esc(v.purpose)+'</div><div style="font-size:12px;color:var(--tx3)">In: '+v.arrived+(v.departed?' &middot; Out: '+v.departed:'')+'</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="'+(v.status==='in'?'badge-in':'badge-out')+'">'+(v.status==='in'?'On site':'Departed')+'</span>'+(v.status==='in'?'<button class="sout-btn" style="font-size:11px;padding:4px 8px" data-id="'+v.id+'">Sign out</button>':'')+'</div></div></div>'}).join('');
+  ll.querySelectorAll('.sout-btn').forEach(function(b){b.addEventListener('click',function(){signOut(this.getAttribute('data-id'))})});
 }
-
-// ─── UI helpers ──────────────────────────────────────────────────────────────
-const colorPairs = [['#EEEDFE','#3C3489'],['#E1F5EE','#085041'],['#E6F1FB','#0C447C'],['#FAEEDA','#633806'],['#FAECE7','#712B13']];
-let colorIdx = 0;
-
-function avatar(v, size=40) {
-  return `<div class="avatar" style="width:${size}px;height:${size}px;background:${v.colorBg};color:${v.colorFg};font-size:${size*0.33}px">${v.initials}</div>`;
+function setFilter(f){lf=f;['all','in','out'].forEach(function(x){document.getElementById('chip-'+x).classList.toggle('active',x===f)});renderLog()}
+function exportCSV(){
+  var rows=['ID,First,Last,Company,Host,Purpose,Arrived,Departed,Status,Date'].concat(db.visitors.map(function(v){return [v.id,v.first,v.last,v.company||'',v.host,v.purpose,v.arrived,v.departed||'',v.status,v.date].join(',')}));
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='visitors-'+new Date().toISOString().split('T')[0]+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
-
-function renderDashboard() {
-  const today = new Date().toDateString();
-  const onSite = db.visitors.filter(v => v.status === 'in');
-  const todayAll = db.visitors.filter(v => v.date === today);
-  const out = db.visitors.filter(v => v.status === 'out' && v.date === today);
-  const week = db.visitors.length;
-  document.getElementById('m-onsite').textContent = onSite.length;
-  document.getElementById('m-today').textContent = todayAll.length;
-  document.getElementById('m-out').textContent = out.length;
-  document.getElementById('m-week').textContent = week;
-
-  const ll = document.getElementById('live-list');
-  if (!onSite.length) {
-    ll.innerHTML = '<div class="empty-state"><div class="empty-icon">🏢</div>No visitors currently on site</div>';
-    return;
+var curStep=1;
+function goStep(n){
+  if(n>1&&curStep===1){
+    if(!document.getElementById('f-first').value.trim()){alert('Please enter first name');return}
+    if(!document.getElementById('f-host').value){alert('Please select a host');return}
+    if(!document.getElementById('f-purpose').value){alert('Please select a purpose');return}
   }
-  ll.innerHTML = onSite.map(v => `
-    <div class="visitor-row">
-      ${avatar(v)}
-      <div class="visitor-info">
-        <div class="visitor-name">${v.first} ${v.last}</div>
-        <div class="visitor-meta">${v.host} · ${v.arrived}</div>
-      </div>
-      <button class="sign-out-btn" onclick="signOut('${v.id}')">Sign out</button>
-    </div>`).join('');
-}
-
-function signOut(id) {
-  const v = db.visitors.find(x => x.id === id);
-  if (!v) return;
-  const now = new Date();
-  v.status = 'out';
-  v.departed = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  saveData(db);
-  renderDashboard();
-  renderLog();
-}
-
-let logFilter = 'all';
-
-function renderLog() {
-  const q = (document.getElementById('log-search').value || '').toLowerCase();
-  let rows = db.visitors.filter(v => {
-    const match = `${v.first} ${v.last} ${v.company} ${v.host} ${v.purpose}`.toLowerCase().includes(q);
-    if (logFilter === 'in') return match && v.status === 'in';
-    if (logFilter === 'out') return match && v.status === 'out';
-    return match;
-  });
-
-  const ll = document.getElementById('log-list');
-  if (!rows.length) {
-    ll.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>No visitors found</div>';
-    return;
-  }
-  ll.innerHTML = rows.map(v => `
-    <div class="card" style="margin-bottom:8px;padding:12px">
-      <div style="display:flex;align-items:center;gap:10px">
-        ${avatar(v, 36)}
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:500">${v.first} ${v.last} <span style="font-size:11px;color:var(--text3)">${v.id}</span></div>
-          <div style="font-size:12px;color:var(--text3)">${v.host} · ${v.purpose}</div>
-          <div style="font-size:12px;color:var(--text3)">In: ${v.arrived}${v.departed ? ' · Out: '+v.departed : ''}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-          <span class="badge ${v.status === 'in' ? 'badge-in' : 'badge-out'}">${v.status === 'in' ? 'On site' : 'Departed'}</span>
-          ${v.status === 'in' ? `<button class="sign-out-btn" style="font-size:11px;padding:4px 8px" onclick="signOut('${v.id}')">Sign out</button>` : ''}
-        </div>
-      </div>
-    </div>`).join('');
-}
-
-function setFilter(f, el) {
-  logFilter = f;
-  document.querySelectorAll('#log-chips .chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  renderLog();
-}
-
-function exportCSV() {
-  const rows = ['ID,First,Last,Company,Email,Host,Purpose,Arrived,Departed,Status,Date',
-    ...db.visitors.map(v => `${v.id},${v.first},${v.last},${v.company||''},${v.email||''},${v.host},${v.purpose},${v.arrived},${v.departed||''},${v.status},${v.date}`)
-  ];
-  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `visitor-log-${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-}
-
-// ─── Sign-in form ────────────────────────────────────────────────────────────
-let currentStep = 1;
-
-function goStep(n) {
-  const first = document.getElementById('f-first').value.trim();
-  const host = document.getElementById('f-host').value;
-  const purpose = document.getElementById('f-purpose').value;
-  if (n > 1 && currentStep === 1) {
-    if (!first) { alert('Please enter the visitor's first name.'); return; }
-    if (!host) { alert('Please select a host.'); return; }
-    if (!purpose) { alert('Please select a purpose.'); return; }
-  }
-  document.getElementById('s'+currentStep).style.display = 'none';
-  currentStep = n;
-  document.getElementById('s'+n).style.display = 'block';
-  document.querySelectorAll('.step').forEach((s, i) => {
-    s.className = 'step' + (i+1 < n ? ' done' : i+1 === n ? ' current' : '');
-  });
-  document.getElementById('content').scrollTo(0, 0);
-}
-
-function capturePhoto() {
-  document.getElementById('photo-box').classList.add('done');
-  document.getElementById('photo-icon').textContent = '✅';
-  document.getElementById('photo-text').textContent = 'Photo captured';
-}
-function captureId() {
-  document.getElementById('id-box').classList.add('done');
-  document.getElementById('id-icon').textContent = '✅';
-  document.getElementById('id-text').textContent = 'ID scanned';
-}
-
-// Signature canvas
-let isDrawing = false, sigCtx;
-function initSig() {
-  const canvas = document.getElementById('sig-canvas');
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = canvas.offsetWidth * dpr;
-  canvas.height = 100 * dpr;
-  sigCtx = canvas.getContext('2d');
-  sigCtx.scale(dpr, dpr);
-  sigCtx.strokeStyle = '#1a1a18';
-  sigCtx.lineWidth = 2;
-  sigCtx.lineCap = 'round';
-  sigCtx.lineJoin = 'round';
-
-  const pos = (e) => {
-    const r = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
-    return [(src.clientX - r.left), (src.clientY - r.top)];
-  };
-  canvas.addEventListener('pointerdown', e => { isDrawing=true; const [x,y]=pos(e); sigCtx.beginPath(); sigCtx.moveTo(x,y); e.preventDefault(); });
-  canvas.addEventListener('pointermove', e => { if(!isDrawing) return; const [x,y]=pos(e); sigCtx.lineTo(x,y); sigCtx.stroke(); e.preventDefault(); });
-  canvas.addEventListener('pointerup', () => isDrawing=false);
-}
-function clearSig() { if(sigCtx) { const c=document.getElementById('sig-canvas'); sigCtx.clearRect(0,0,c.width,c.height); } }
-
-function completeSignIn() {
-  if (!document.getElementById('agree1').checked || !document.getElementById('agree2').checked) {
-    alert('Please accept both agreements to continue.'); return;
-  }
-  const first = document.getElementById('f-first').value.trim() || 'Visitor';
-  const last = document.getElementById('f-last').value.trim() || '';
-  const company = document.getElementById('f-company').value.trim();
-  const host = document.getElementById('f-host').value.split('–')[0].trim();
-  const purpose = document.getElementById('f-purpose').value;
-  const now = new Date();
-  const arrived = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const pair = colorPairs[colorIdx % colorPairs.length]; colorIdx++;
-  const v = {
-    id: 'VIS-' + String(db.nextId++).padStart(4,'0'),
-    first, last, company, email: document.getElementById('f-email').value.trim(),
-    phone: document.getElementById('f-phone').value.trim(),
-    host, purpose, arrived, departed: null, status: 'in',
-    date: now.toDateString(), initials: ((first[0]||'V')+(last[0]||'I')).toUpperCase(),
-    colorBg: pair[0], colorFg: pair[1]
-  };
-  db.visitors.unshift(v);
-  saveData(db);
-  document.getElementById('success-name').textContent = `${first} ${last} signed in`;
-  document.getElementById('success-meta').textContent = `Visiting ${host} · ${purpose}`;
-  updateBadge(v);
-  goStep(4);
-}
-
-function resetForm() {
-  ['f-first','f-last','f-email','f-phone','f-company'].forEach(id => document.getElementById(id).value = '');
-  ['f-host','f-purpose','f-id-type'].forEach(id => document.getElementById(id).selectedIndex = 0);
-  document.getElementById('agree1').checked = false;
-  document.getElementById('agree2').checked = false;
-  document.getElementById('photo-box').classList.remove('done');
-  document.getElementById('id-box').classList.remove('done');
-  document.getElementById('photo-icon').textContent = '📷';
-  document.getElementById('photo-text').textContent = 'Tap to capture photo';
-  document.getElementById('id-icon').textContent = '🪪';
-  document.getElementById('id-text').textContent = 'Tap to scan ID';
-  clearSig();
-  goStep(1);
-}
-
-function updateBadge(v) {
-  if (!v) v = db.visitors[0];
-  if (!v) return;
-  document.getElementById('b-name').textContent = `${v.first} ${v.last}`;
-  document.getElementById('b-company').textContent = v.company || '—';
-  document.getElementById('b-id').textContent = v.id;
-  document.getElementById('b-host').textContent = v.host;
-  document.getElementById('b-purpose').textContent = v.purpose;
-  document.getElementById('b-date').textContent = new Date().toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'});
-  document.getElementById('b-expires').textContent = '18:00';
-}
-
-function printBadge() { window.print(); }
-
-function shareVisitorCard() {
-  if (navigator.share) {
-    navigator.share({ title: 'Visitor Badge', text: 'VisitorFlow visitor pass', url: window.location.href });
-  } else {
-    alert('Copy this page URL to share');
-  }
-}
-
-// ─── View routing ────────────────────────────────────────────────────────────
-const viewTitles = { dashboard:'Dashboard', signin:'Sign in visitor', log:'Visitor log', badge:'Badge' };
-const viewSubs = { dashboard:'Live overview', signin:'New check-in', log:'All visitors', badge:'Print pass' };
-
-function showView(name, el) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
-  (el || document.getElementById('nav-'+name)).classList.add('active');
-  document.getElementById('topbar-title').textContent = viewTitles[name];
-  document.getElementById('topbar-sub').textContent = viewSubs[name];
-  const btn = document.getElementById('topbar-btn');
-  btn.style.display = name === 'signin' ? 'none' : '';
-  if (name === 'dashboard') renderDashboard();
-  if (name === 'log') renderLog();
-  if (name === 'badge') updateBadge();
-  if (name === 'signin' && currentStep === 4) resetForm();
-  if (name === 'signin') setTimeout(initSig, 100);
+  document.getElementById('s'+curStep).style.display='none';curStep=n;document.getElementById('s'+n).style.display='block';
+  document.querySelectorAll('.step').forEach(function(s,i){s.className='step'+(i+1<n?' done':i+1===n?' current':'')});
   document.getElementById('content').scrollTo(0,0);
 }
-
-function handleTopbarAction() {
-  showView('signin', document.getElementById('nav-signin'));
+function completeSignIn(){
+  if(!document.getElementById('agree1').checked||!document.getElementById('agree2').checked){alert('Please accept both agreements');return}
+  var first=document.getElementById('f-first').value.trim()||'Visitor';
+  var last=document.getElementById('f-last').value.trim()||'';
+  var host=document.getElementById('f-host').value.split('-')[0].trim();
+  var purpose=document.getElementById('f-purpose').value;
+  var pair=CPairs[cpIdx%CPairs.length];cpIdx++;
+  var v={id:'VIS-'+String(db.nextId++).padStart(4,'0'),first:first,last:last,company:document.getElementById('f-company').value.trim(),email:document.getElementById('f-email').value.trim(),phone:document.getElementById('f-phone').value.trim(),host:host,purpose:purpose,arrived:ts(),departed:null,status:'in',date:new Date().toDateString(),ini:((first[0]||'V')+(last[0]||'V')).toUpperCase(),cbg:pair[0],cfg:pair[1]};
+  db.visitors.unshift(v);save(db);
+  document.getElementById('success-name').textContent=first+' '+last+' signed in';
+  document.getElementById('success-meta').textContent='Visiting '+host+' for '+purpose;
+  updateBadge(v);goStep(4);
 }
-
-// ─── PWA install prompt ───────────────────────────────────────────────────────
-let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if (!localStorage.getItem('install_dismissed')) {
-    document.getElementById('install-banner').style.display = 'flex';
-  }
+function resetForm(){
+  ['f-first','f-last','f-email','f-phone','f-company'].forEach(function(id){document.getElementById(id).value=''});
+  ['f-host','f-purpose','f-id-type'].forEach(function(id){document.getElementById(id).selectedIndex=0});
+  document.getElementById('agree1').checked=false;document.getElementById('agree2').checked=false;
+  document.getElementById('photo-box').classList.remove('done');document.getElementById('photo-icon').textContent='\u{1F4F7}';document.getElementById('photo-text').textContent='Tap to capture photo';
+  document.getElementById('id-box').classList.remove('done');document.getElementById('id-icon').textContent='\u{1FAAA}';document.getElementById('id-text').textContent='Tap to scan ID';
+  clearSig();goStep(1);
+}
+var sigCtx=null,drawing=false;
+function initSig(){
+  var c=document.getElementById('sig-canvas');if(!c||sigCtx)return;
+  var dpr=window.devicePixelRatio||1;c.width=c.offsetWidth*dpr;c.height=100*dpr;
+  sigCtx=c.getContext('2d');sigCtx.scale(dpr,dpr);sigCtx.strokeStyle='#1a1a18';sigCtx.lineWidth=2;sigCtx.lineCap='round';sigCtx.lineJoin='round';
+  function pt(e){var r=c.getBoundingClientRect();var s=e.touches?e.touches[0]:e;return[s.clientX-r.left,s.clientY-r.top]}
+  c.addEventListener('pointerdown',function(e){drawing=true;var p=pt(e);sigCtx.beginPath();sigCtx.moveTo(p[0],p[1]);e.preventDefault()});
+  c.addEventListener('pointermove',function(e){if(!drawing)return;var p=pt(e);sigCtx.lineTo(p[0],p[1]);sigCtx.stroke();e.preventDefault()});
+  c.addEventListener('pointerup',function(){drawing=false});
+}
+function clearSig(){if(sigCtx){var c=document.getElementById('sig-canvas');sigCtx.clearRect(0,0,c.width,c.height)}}
+function updateBadge(v){
+  v=v||db.visitors[0];if(!v)return;
+  document.getElementById('b-name').textContent=v.first+' '+v.last;
+  document.getElementById('b-company').textContent=v.company||'-';
+  document.getElementById('b-id').textContent=v.id;
+  document.getElementById('b-host').textContent=v.host;
+  document.getElementById('b-purpose').textContent=v.purpose;
+  document.getElementById('b-date').textContent=new Date().toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('b-expires').textContent='18:00';
+}
+var titles={dashboard:'Dashboard',signin:'Sign in visitor',log:'Visitor log',badge:'Badge'};
+function showView(name){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});
+  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active')});
+  document.getElementById('view-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+  document.getElementById('topbar-title').textContent=titles[name];
+  document.getElementById('topbar-btn').style.display=name==='signin'?'none':'';
+  if(name==='dashboard')renderDash();
+  if(name==='log')renderLog();
+  if(name==='badge')updateBadge();
+  if(name==='signin'){if(curStep===4)resetForm();setTimeout(initSig,200)}
+  document.getElementById('content').scrollTo(0,0);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('nav-dashboard').addEventListener('click',function(){showView('dashboard')});
+  document.getElementById('nav-signin').addEventListener('click',function(){showView('signin')});
+  document.getElementById('nav-log').addEventListener('click',function(){showView('log')});
+  document.getElementById('nav-badge').addEventListener('click',function(){showView('badge')});
+  document.getElementById('topbar-btn').addEventListener('click',function(){showView('signin')});
+  document.getElementById('btn-s1-next').addEventListener('click',function(){goStep(2)});
+  document.getElementById('btn-s2-next').addEventListener('click',function(){goStep(3)});
+  document.getElementById('btn-s2-back').addEventListener('click',function(){goStep(1)});
+  document.getElementById('btn-complete').addEventListener('click',completeSignIn);
+  document.getElementById('btn-s3-back').addEventListener('click',function(){goStep(2)});
+  document.getElementById('btn-clear-sig').addEventListener('click',clearSig);
+  document.getElementById('btn-new-visitor').addEventListener('click',resetForm);
+  document.getElementById('btn-print-s4').addEventListener('click',function(){showView('badge');setTimeout(function(){window.print()},300)});
+  document.getElementById('btn-print-badge').addEventListener('click',function(){window.print()});
+  document.getElementById('photo-box').addEventListener('click',function(){this.classList.add('done');document.getElementById('photo-icon').textContent='OK';document.getElementById('photo-text').textContent='Photo captured'});
+  document.getElementById('id-box').addEventListener('click',function(){this.classList.add('done');document.getElementById('id-icon').textContent='OK';document.getElementById('id-text').textContent='ID scanned'});
+  document.getElementById('log-search').addEventListener('input',renderLog);
+  document.getElementById('chip-all').addEventListener('click',function(){setFilter('all')});
+  document.getElementById('chip-in').addEventListener('click',function(){setFilter('in')});
+  document.getElementById('chip-out').addEventListener('click',function(){setFilter('out')});
+  document.getElementById('btn-export').addEventListener('click',exportCSV);
+  window.addEventListener('online',function(){document.getElementById('offline-bar').style.display='none'});
+  window.addEventListener('offline',function(){document.getElementById('offline-bar').style.display='block'});
+  if(!navigator.onLine)document.getElementById('offline-bar').style.display='block';
+  renderDash();
 });
-document.getElementById('install-btn').addEventListener('click', async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  deferredPrompt = null;
-  document.getElementById('install-banner').style.display = 'none';
-});
-function dismissBanner() {
-  document.getElementById('install-banner').style.display = 'none';
-  localStorage.setItem('install_dismissed', '1');
-}
-
-// ─── Offline detection ───────────────────────────────────────────────────────
-function updateOnline() {
-  document.getElementById('offline-bar').style.display = navigator.onLine ? 'none' : 'block';
-}
-window.addEventListener('online', updateOnline);
-window.addEventListener('offline', updateOnline);
-updateOnline();
-
-// ─── Service worker registration ──────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
-
-// ─── Init ────────────────────────────────────────────────────────────────────
-renderDashboard();
+})();
 </script>
 </body>
 </html>
