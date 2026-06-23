@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_2.html -->
+<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_3.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -52,7 +52,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
 .check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
 .check-row input[type=checkbox]{width:20px;height:20px;margin-top:1px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
 .check-row label{font-size:14px;color:var(--tx);line-height:1.4;cursor:pointer}
-#sig-canvas{width:100%;height:100px;border:1.5px solid var(--br2);border-radius:10px;background:var(--bg);touch-action:none;display:block}
+
 /* BOTTOM BAR & BUTTONS */
 .bottom-bar{padding:12px 16px calc(var(--sb)+12px);background:var(--bg);border-top:0.5px solid var(--br);flex-shrink:0;display:flex;gap:10px}
 .btn-main{flex:1;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:15px;font-size:16px;font-weight:700;cursor:pointer}
@@ -132,7 +132,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
   </div>
   <div class="content">
     <div id="si-s1">
-      <div class="steps"><div class="step current"></div><div class="step"></div><div class="step"></div></div>
+      <div class="steps"><div class="step current"></div><div class="step"></div></div>
       <div class="card">
         <div class="card-title">Your details</div>
         <div class="row2">
@@ -143,40 +143,23 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
         <div class="field"><label>Phone (optional)</label><input id="f-phone" type="tel" placeholder="+61 4xx xxx xxx" autocomplete="tel"></div>
         <div class="field"><label>Company</label><input id="f-company" type="text" placeholder="Acme Corp" autocomplete="organization"></div>
         <div class="field"><label>Host / Person visiting</label>
-          <select id="f-host"><option value="">Select host...</option><option>Alex Chen - Engineering</option><option>Sarah Park - HR</option><option>Marcus Webb - Finance</option><option>Priya Nair - Legal</option><option>Tom Ellison - CEO</option></select>
+          <select id="f-host"><option value="">Select host...</option><option value="Alex Chen - Engineering">Alex Chen - Engineering</option><option value="Sarah Park - HR">Sarah Park - HR</option><option value="Marcus Webb - Finance">Marcus Webb - Finance</option><option value="Priya Nair - Legal">Priya Nair - Legal</option><option value="Tom Ellison - CEO">Tom Ellison - CEO</option></select>
         </div>
         <div class="field"><label>Purpose of visit</label>
           <select id="f-purpose"><option value="">Select...</option><option>Meeting / interview</option><option>Delivery / contractor</option><option>Client visit</option><option>Building maintenance</option><option>Other</option></select>
         </div>
       </div>
     </div>
-    <div id="si-s2" style="display:none">
-      <div class="steps"><div class="step done"></div><div class="step current"></div><div class="step"></div></div>
-      <div class="card">
-        <div class="card-title">Photo &amp; ID</div>
-        <div class="field"><label>Visitor photo</label>
-          <div style="border:1.5px dashed var(--br2);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer" id="photo-box">
-            <div style="font-size:36px;margin-bottom:6px" id="photo-icon">📷</div>
-            <div style="font-size:13px;color:var(--tx3)" id="photo-text">Tap to capture photo</div>
-          </div>
-        </div>
-        <div class="field"><label>ID type</label>
-          <select id="f-id-type"><option>Driver licence</option><option>Passport</option><option>Employee card</option><option>Other ID</option></select>
-        </div>
       </div>
     </div>
     <div id="si-s3" style="display:none">
-      <div class="steps"><div class="step done"></div><div class="step done"></div><div class="step current"></div></div>
+      <div class="steps"><div class="step done"></div><div class="step current"></div></div>
       <div class="card">
-        <div class="card-title">Agreement &amp; Signature</div>
+        <div class="card-title">Agreement</div>
         <div class="agree-text">As a visitor to IGT premises, you agree to follow all safety and security instructions; not access restricted areas; keep all information observed confidential; not photograph or record without prior permission; carry your visitor badge at all times; sign out before leaving.</div>
         <div class="check-row"><input type="checkbox" id="agree1"><label for="agree1">I agree to the IGT visitor policy and site rules</label></div>
         <div class="check-row"><input type="checkbox" id="agree2"><label for="agree2">I consent to photo capture for security purposes</label></div>
-        <div class="field" style="margin-top:12px"><label>Signature</label>
-          <canvas id="sig-canvas"></canvas>
-          <button style="margin-top:6px;padding:8px 16px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;font-size:13px;cursor:pointer" id="btn-clear-sig">Clear</button>
         </div>
-      </div>
     </div>
     <div id="si-s4" style="display:none">
       <div class="card">
@@ -195,7 +178,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
     <button class="btn-back2" id="si-step-back" style="display:none">Back</button>
     <button class="btn-main" id="si-step-next">Continue</button>
   </div>
-</div>
+
 
 <!-- SIGN-OUT SCREEN -->
 <div id="screen-signout" style="display: none;">
@@ -268,12 +251,25 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
       <div class="search-bar"><span style="color:var(--tx3)">🔍</span><input type="text" id="log-search" placeholder="Search visitors..."></div>
       <div class="tab-row"><div class="tab active" id="tab-all">All</div><div class="tab" id="tab-in">On site</div><div class="tab" id="tab-out">Signed out</div></div>
       <div class="card" style="padding:0 16px"><div id="log-list"></div></div>
-      <button class="btn-exp" id="btn-export">⬇ Export CSV</button>
+      <button class="btn-exp" id="btn-export">⬇ Export Visitor CSV</button>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Employee list</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:12px">Import a CSV with columns: <b>Name, Email</b> (one per row). These appear as hosts in the sign-in form.</p>
+        <label style="display:block;border:1.5px dashed var(--br2);border-radius:10px;padding:20px;text-align:center;cursor:pointer" id="import-label">
+          <div style="font-size:28px;margin-bottom:6px">📂</div>
+          <div style="font-size:14px;font-weight:600;color:var(--blue)">Tap to import employees CSV</div>
+          <div style="font-size:12px;color:var(--tx3);margin-top:4px">Name, Email columns required</div>
+          <input type="file" id="emp-file" accept=".csv" style="display:none">
+        </label>
+        <div id="emp-status" style="margin-top:10px;font-size:13px;color:var(--tx3);display:none"></div>
+        <div id="emp-list" style="margin-top:12px"></div>
+        <button class="btn-exp" id="btn-clear-emp" style="margin-top:8px;display:none;color:var(--rd);border-color:var(--rd)">🗑 Clear employee list</button>
+      </div>
     </div>
   </div>
 </div>
 
-</div>
+
 <script>
 (function(){
 var DB="igt_v3";
@@ -308,8 +304,8 @@ function siNext(){
     if(!document.getElementById("f-first").value.trim()){alert("Please enter your first name");return}
     if(!document.getElementById("f-host").value){alert("Please select a host");return}
     if(!document.getElementById("f-purpose").value){alert("Please select a purpose");return}
-    showSiStep(2);
-  }else if(siStep===2){showSiStep(3);setTimeout(initSig,150)}
+    showSiStep(3);
+  }else if(siStep===2){showSiStep(3)}
   else if(siStep===3){
     if(!document.getElementById("agree1").checked||!document.getElementById("agree2").checked){alert("Please accept both agreements");return}
     var first=document.getElementById("f-first").value.trim()||"Visitor";
@@ -326,24 +322,11 @@ function siNext(){
 }
 function resetSiForm(){
   ["f-first","f-last","f-email","f-phone","f-company"].forEach(function(id){document.getElementById(id).value=""});
-  ["f-host","f-purpose","f-id-type"].forEach(function(id){document.getElementById(id).selectedIndex=0});
+  ["f-host","f-purpose"].forEach(function(id){document.getElementById(id).selectedIndex=0});
   document.getElementById("agree1").checked=false;document.getElementById("agree2").checked=false;
-  document.getElementById("photo-box").style.background="";
-  document.getElementById("photo-icon").textContent="\u{1F4F7}";
-  document.getElementById("photo-text").textContent="Tap to capture photo";
-  sigCtx=null;showSiStep(1);
+showSiStep(1);
 }
-var sigCtx=null,drawing=false;
-function initSig(){
-  var c=document.getElementById("sig-canvas");if(!c)return;sigCtx=null;
-  var dpr=window.devicePixelRatio||1;c.width=c.offsetWidth*dpr;c.height=100*dpr;
-  sigCtx=c.getContext("2d");sigCtx.scale(dpr,dpr);sigCtx.strokeStyle="#0050C8";sigCtx.lineWidth=2.5;sigCtx.lineCap="round";sigCtx.lineJoin="round";
-  function pt(e){var r=c.getBoundingClientRect();var s=e.touches?e.touches[0]:e;return[s.clientX-r.left,s.clientY-r.top]}
-  c.addEventListener("pointerdown",function(e){drawing=true;var p=pt(e);sigCtx.beginPath();sigCtx.moveTo(p[0],p[1]);e.preventDefault()});
-  c.addEventListener("pointermove",function(e){if(!drawing)return;var p=pt(e);sigCtx.lineTo(p[0],p[1]);sigCtx.stroke();e.preventDefault()});
-  c.addEventListener("pointerup",function(){drawing=false});
-}
-function clearSig(){if(sigCtx){var c=document.getElementById("sig-canvas");sigCtx.clearRect(0,0,c.width,c.height)}}
+
 var soV=null;
 function lookupV(){
   var q=(document.getElementById("so-search").value||"").toLowerCase().trim();if(!q)return;
@@ -370,7 +353,7 @@ function confirmSO(){
 var pin="",PIN="1234";
 function pinKey(k){
   if(k==="del"){pin=pin.slice(0,-1)}
-  else if(k==="ok"){if(pin===PIN){document.getElementById("admin-pin").style.display="none";document.getElementById("admin-dash").style.display="flex";renderAdmin()}else{alert("Incorrect PIN");pin=""}}
+  else if(k==="ok"){if(pin===PIN){document.getElementById("admin-pin").style.display="none";document.getElementById("admin-dash").style.display="flex";renderEmpList();renderAdmin()}else{alert("Incorrect PIN");pin=""}}
   else if(pin.length<4){pin+=k}
   [0,1,2,3].forEach(function(i){document.getElementById("pd"+i).classList.toggle("filled",i<pin.length)});
 }
@@ -393,6 +376,98 @@ function renderLog(){
 }
 function setTab(f){lf=f;["all","in","out"].forEach(function(x){document.getElementById("tab-"+x).classList.toggle("active",x===f)});renderLog()}
 function exportCSV(){var rows=["ID,First,Last,Company,Host,Purpose,Arrived,Departed,Status,Date"].concat(db.visitors.map(function(v){return[v.id,v.first,v.last,v.company||"",v.host,v.purpose,v.arrived,v.departed||"",v.status,v.date].join(",")}));var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.join("\n")],{type:"text/csv"}));a.download="igt-visitors-"+new Date().toISOString().split("T")[0]+".csv";document.body.appendChild(a);a.click();document.body.removeChild(a)}
+
+// ── Employee list ─────────────────────────────────────────────────────────────
+var EMP_KEY = "igt_employees";
+function loadEmps(){try{var d=localStorage.getItem(EMP_KEY);return d?JSON.parse(d):[]}catch(e){return[]}}
+function saveEmps(emps){try{localStorage.setItem(EMP_KEY,JSON.stringify(emps))}catch(e){}}
+
+function populateHostSelect(){
+  var sel=document.getElementById("f-host");
+  var emps=loadEmps();
+  // Keep first blank option
+  sel.innerHTML='<option value="">Select host...</option>';
+  if(emps.length===0){
+    // fallback defaults
+    ["Alex Chen - Engineering","Sarah Park - HR","Marcus Webb - Finance","Priya Nair - Legal","Tom Ellison - CEO"].forEach(function(name){
+      var o=document.createElement("option");o.value=name;o.textContent=name;sel.appendChild(o);
+    });
+  } else {
+    emps.forEach(function(e){
+      var o=document.createElement("option");
+      o.value=e.name;
+      o.setAttribute("data-email",e.email||"");
+      o.textContent=e.name+(e.dept?" - "+e.dept:"");
+      sel.appendChild(o);
+    });
+  }
+}
+
+function renderEmpList(){
+  var emps=loadEmps();
+  var list=document.getElementById("emp-list");
+  var status=document.getElementById("emp-status");
+  var clearBtn=document.getElementById("btn-clear-emp");
+  if(!list)return;
+  if(emps.length===0){list.innerHTML="";clearBtn.style.display="none";return}
+  status.style.display="block";
+  status.textContent=emps.length+" employee"+(emps.length!==1?"s":"")+" loaded";
+  clearBtn.style.display="block";
+  list.innerHTML='<div style="max-height:200px;overflow-y:auto">'+
+    emps.slice(0,50).map(function(e){
+      return'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--br)">'+
+        '<div style="width:32px;height:32px;border-radius:50%;background:#DDEEFF;color:#003A96;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'+
+        (e.name||"?").split(" ").map(function(w){return w[0]||""}).slice(0,2).join("").toUpperCase()+
+        '</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">'+esc(e.name)+'</div>'+
+        '<div style="font-size:11px;color:var(--tx3)">'+esc(e.email||"")+(e.dept?' &middot; '+esc(e.dept):"")+'</div></div></div>'
+    }).join("")+
+    (emps.length>50?'<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and '+(emps.length-50)+' more</div>':'')+
+  '</div>';
+}
+
+function parseEmpCSV(text){
+  var lines=text.trim().split(/\r?\n/);
+  if(lines.length<1)return[];
+  // Detect header row
+  var first=lines[0].toLowerCase();
+  var hasHeader=first.indexOf("name")>=0||first.indexOf("email")>=0||first.indexOf("first")>=0;
+  var dataLines=hasHeader?lines.slice(1):lines;
+  var emps=[];
+  dataLines.forEach(function(line){
+    if(!line.trim())return;
+    // Handle quoted CSV
+    var cols=[];
+    var cur="",inQ=false;
+    for(var i=0;i<line.length;i++){
+      var ch=line[i];
+      if(ch==='"'){inQ=!inQ}
+      else if(ch===","&&!inQ){cols.push(cur.trim());cur=""}
+      else{cur+=ch}
+    }
+    cols.push(cur.trim());
+    // Try to find name and email columns
+    var name="",email="",dept="";
+    if(hasHeader){
+      var headers=lines[0].toLowerCase().split(",").map(function(h){return h.replace(/"/g,"").trim()});
+      headers.forEach(function(h,i){
+        var val=(cols[i]||"").replace(/"/g,"").trim();
+        if(h==="name"||h==="full name"||h==="fullname")name=val;
+        else if(h==="first name"||h==="firstname"||h==="first")name=(name?name+" ":"")+val;
+        else if(h==="last name"||h==="lastname"||h==="surname"||h==="last")name=(name?name+" ":"")+val;
+        else if(h==="email"||h==="email address"||h==="emailaddress")email=val;
+        else if(h==="department"||h==="dept"||h==="team"||h==="division")dept=val;
+      });
+    } else {
+      // No header: assume Name, Email[, Dept]
+      name=(cols[0]||"").replace(/"/g,"").trim();
+      email=(cols[1]||"").replace(/"/g,"").trim();
+      dept=(cols[2]||"").replace(/"/g,"").trim();
+    }
+    if(name){emps.push({name:name,email:email,dept:dept})}
+  });
+  return emps;
+}
+
 document.addEventListener("DOMContentLoaded",function(){
   document.getElementById("btn-go-signin").addEventListener("click",function(){resetSiForm();showScreen("screen-signin")});
   document.getElementById("btn-go-signout").addEventListener("click",function(){document.getElementById("lookup-result").style.display="none";document.getElementById("so-success").style.display="none";document.getElementById("so-search").value="";showScreen("screen-signout")});
@@ -400,10 +475,8 @@ document.addEventListener("DOMContentLoaded",function(){
   document.getElementById("si-back").addEventListener("click",function(){if(siStep===1){showScreen("screen-home")}else{showSiStep(siStep-1)}});
   document.getElementById("si-step-next").addEventListener("click",siNext);
   document.getElementById("si-step-back").addEventListener("click",function(){showSiStep(siStep-1)});
-  document.getElementById("btn-clear-sig").addEventListener("click",clearSig);
-  document.getElementById("btn-done-home").addEventListener("click",function(){showScreen("screen-home")});
-  document.getElementById("photo-box").addEventListener("click",function(){this.style.background="var(--gl)";document.getElementById("photo-icon").textContent="OK";document.getElementById("photo-text").textContent="Photo captured"});
-  document.getElementById("so-back").addEventListener("click",function(){showScreen("screen-home")});
+    document.getElementById("btn-done-home").addEventListener("click",function(){showScreen("screen-home")});
+    document.getElementById("so-back").addEventListener("click",function(){showScreen("screen-home")});
   document.getElementById("so-lookup-btn").addEventListener("click",lookupV);
   document.getElementById("so-search").addEventListener("keydown",function(e){if(e.key==="Enter")lookupV()});
   document.getElementById("so-confirm-btn").addEventListener("click",confirmSO);
@@ -417,6 +490,33 @@ document.addEventListener("DOMContentLoaded",function(){
   document.getElementById("tab-out").addEventListener("click",function(){setTab("out")});
   document.getElementById("btn-export").addEventListener("click",exportCSV);
   showScreen("screen-home");
+  populateHostSelect();
+
+  // Employee import
+  document.getElementById("import-label").addEventListener("click",function(){
+    document.getElementById("emp-file").click();
+  });
+  document.getElementById("emp-file").addEventListener("change",function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var emps=parseEmpCSV(ev.target.result);
+      if(emps.length===0){alert("No employees found. Make sure your CSV has Name and Email columns.");return}
+      saveEmps(emps);
+      renderEmpList();
+      populateHostSelect();
+      alert(emps.length+" employees imported successfully!");
+    };
+    reader.readAsText(file);
+    e.target.value="";
+  });
+  document.getElementById("btn-clear-emp").addEventListener("click",function(){
+    if(!confirm("Clear all employees and restore defaults?"))return;
+    localStorage.removeItem("igt_employees");
+    renderEmpList();
+    populateHostSelect();
+  });
+  renderEmpList();
 });
 })();
 </script>
