@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_1.html -->
+<!-- saved from url=(0060)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_2.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -391,9 +391,9 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
         <button class="btn-full" id="btn-change-pin">Update PIN</button>
         <div id="pin-change-msg" style="font-size:13px;text-align:center;margin-top:10px;display:none;padding:8px;border-radius:8px"></div>
         <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid var(--br)">
-          <div style="font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Face ID / Fingerprint</div>
-          <div id="biometric-admin-status" style="font-size:13px;color:var(--tx3);margin-bottom:10px"></div>
-          <button class="btn-full" id="btn-enroll-biometric" style="background:var(--blue)">🔓 Enroll Face ID / Fingerprint</button>
+          <div style="font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">🔓 Face ID / Fingerprint</div>
+          <div id="biometric-admin-status" style="font-size:13px;color:var(--tx3);margin-bottom:10px">Not enrolled yet. Tap the button below to set up Face ID or fingerprint.</div>
+          <button class="btn-full" id="btn-enroll-biometric" style="background:var(--blue)">Enroll Face ID / Fingerprint</button>
           <button class="btn-full" id="btn-remove-biometric" style="display:none;background:var(--rd);margin-top:8px">Remove biometric login</button>
         </div>
       </div>
@@ -1225,34 +1225,30 @@ function populateWebhookEmpSelect() {
 }
 
 function updateBiometricAdminStatus() {
-  var statusEl = document.getElementById('biometric-admin-status');
+  var statusEl  = document.getElementById('biometric-admin-status');
   var enrollBtn = document.getElementById('btn-enroll-biometric');
   var removeBtn = document.getElementById('btn-remove-biometric');
-  if (!statusEl) return;
+  if (!statusEl || !enrollBtn) return;
   var enrolled = localStorage.getItem(BIOMETRIC_KEY);
+  // Always show the enroll button — let browser handle availability
+  enrollBtn.style.display = '';
   if (!isBiometricAvailable()) {
-    statusEl.textContent = 'Biometrics not supported on this device.';
-    enrollBtn.style.display = 'none';
+    statusEl.textContent = 'Biometric API not available. Use HTTPS or a supported browser.';
+    enrollBtn.style.background = 'var(--tx3)';
     removeBtn.style.display = 'none';
     return;
   }
-  PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function(available) {
-    if (!available) {
-      statusEl.textContent = 'No biometric sensor detected on this device.';
-      enrollBtn.style.display = 'none';
-      removeBtn.style.display = 'none';
-      return;
-    }
-    if (enrolled) {
-      statusEl.innerHTML = '<span style="color:var(--g);font-weight:600">&#10003; Biometric login is active</span>';
-      enrollBtn.textContent = '\uD83D\uDD13 Re-enroll Face ID / Fingerprint';
-      removeBtn.style.display = '';
-    } else {
-      statusEl.textContent = 'Not enrolled. Tap below to set up Face ID or fingerprint login.';
-      enrollBtn.textContent = '\uD83D\uDD13 Enroll Face ID / Fingerprint';
-      removeBtn.style.display = 'none';
-    }
-  });
+  if (enrolled) {
+    statusEl.innerHTML = '<span style="color:var(--g);font-weight:600">&#10003; Biometric login is active on this device</span>';
+    enrollBtn.textContent = 'Re-enroll Face ID / Fingerprint';
+    enrollBtn.style.background = 'var(--blue)';
+    removeBtn.style.display = '';
+  } else {
+    statusEl.textContent = 'Not enrolled yet. Tap the button below to set up Face ID or fingerprint.';
+    enrollBtn.textContent = 'Enroll Face ID / Fingerprint';
+    enrollBtn.style.background = 'var(--blue)';
+    removeBtn.style.display = 'none';
+  }
 }
 
 /* ── Field settings ────────────────────────────────────── */
@@ -1541,8 +1537,8 @@ document.addEventListener('DOMContentLoaded', function() {
   renderEmpList();
   show('screen-home');
   document.getElementById('si-bar').style.display = 'none';
-  // Init biometric button visibility
   updateBiometricUI();
+  updateBiometricAdminStatus();
 });
 
 })();
