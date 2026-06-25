@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0061)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn_12.html -->
+<!-- saved from url=(0058)file:///C:/Users/kry23780/Downloads/IGT_VisitorSignIn.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -352,12 +352,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
           <div style="font-size:12px;font-weight:600;color:var(--tx2);margin-bottom:6px">How to get a webhook URL in Teams:</div>
           <ol style="font-size:12px;color:var(--tx3);padding-left:16px;line-height:1.8">
             <li>Open Microsoft Teams</li>
-            <li>Go to a channel (e.g. your personal channel or reception)</li>
-            <li>Click ⋯ next to channel name → Connectors</li>
-            <li>Find <b>Incoming Webhook</b> → Configure</li>
-            <li>Name it (e.g. "Visitor Alert") → Create</li>
-            <li>Copy the URL and paste it above</li>
+            <li>Click <b>⋯</b> next to the channel you want</li>
+            <li>Select <b>Workflows</b></li>
+            <li>Choose <b>"Post to a channel when a webhook request is received"</b></li>
+            <li>Sign in, pick your channel, click <b>Add workflow</b></li>
+            <li>Copy the URL generated and paste it above</li>
           </ol>
+          <div style="font-size:11px;color:var(--tx3);margin-top:8px;padding-top:8px;border-top:0.5px solid var(--br)">
+            Can't find Workflows on the channel? In Teams left sidebar click <b>View more apps</b>, search for <b>Workflows</b>, open it, go to <b>Create</b> tab and search <b>"When a Teams webhook request is received"</b>.
+          </div>
         </div>
       </div>
 
@@ -367,6 +370,23 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sa
         <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Toggle fields on or off and set whether they are mandatory. Locked fields are always shown.</p>
         <div id="field-settings-list"></div>
         <button class="btn-sec" id="btn-reset-fields" style="margin-top:4px">↻ Reset to defaults</button>
+      </div>
+
+      <!-- Change admin PIN -->
+      <div class="card" style="margin-top:4px;margin-bottom:24px">
+        <div class="card-title" style="display:flex;align-items:center;gap:8px">🔒 Change admin PIN</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Change the 4-digit PIN used to access this admin panel.</p>
+        <div class="field"><label>Current PIN</label>
+          <input id="pin-current" type="password" inputmode="numeric" maxlength="4" placeholder="●●●●" style="letter-spacing:6px;font-size:22px;text-align:center">
+        </div>
+        <div class="field"><label>New PIN (4 digits)</label>
+          <input id="pin-new" type="password" inputmode="numeric" maxlength="4" placeholder="●●●●" style="letter-spacing:6px;font-size:22px;text-align:center">
+        </div>
+        <div class="field"><label>Confirm new PIN</label>
+          <input id="pin-confirm" type="password" inputmode="numeric" maxlength="4" placeholder="●●●●" style="letter-spacing:6px;font-size:22px;text-align:center">
+        </div>
+        <button class="btn-full" id="btn-change-pin">Update PIN</button>
+        <div id="pin-change-msg" style="font-size:13px;text-align:center;margin-top:10px;display:none;padding:8px;border-radius:8px"></div>
       </div>
 
     </div>
@@ -827,7 +847,8 @@ function soConfirm() {
 }
 
 /* ── Admin PIN ─────────────────────────────────────────── */
-var pin = '', PIN = '1234';
+var pin = '';
+var PIN = localStorage.getItem('igt_admin_pin') || '1234';
 
 function pinKey(k) {
   if (k === 'del') {
@@ -984,25 +1005,29 @@ function parseCSV(text) {
 function sendTeamsNotification(webhookUrl, visitor) {
   if (!webhookUrl || !webhookUrl.startsWith('http')) return;
   var arrived = visitor.arrived || '';
+  var dateStr = new Date().toLocaleDateString('en-AU', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
   var payload = {
-    "@type": "MessageCard",
-    "@context": "http://schema.org/extensions",
-    "themeColor": "0050C8",
-    "summary": "Visitor arrived: " + visitor.first + " " + visitor.last,
-    "sections": [{
-      "activityTitle": "&#128100; Visitor has arrived",
-      "activitySubtitle": new Date().toLocaleDateString('en-AU', {weekday:'long', day:'2-digit', month:'long', year:'numeric'}) + " at " + arrived,
-      "activityImage": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Font_Awesome_5_solid_user.svg/240px-Font_Awesome_5_solid_user.svg.png",
-      "facts": [
-        {"name": "Visitor", "value": visitor.first + " " + visitor.last},
-        {"name": "Company", "value": visitor.company || "—"},
-        {"name": "Purpose", "value": visitor.purpose || "—"},
-        {"name": "Arrived", "value": arrived},
-        {"name": "Visitor ID", "value": visitor.id}
-      ],
-      "markdown": true
-    }],
-    "potentialAction": []
+    "type": "message",
+    "attachments": [{
+      "contentType": "application/vnd.microsoft.card.adaptive",
+      "content": {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+          {"type":"TextBlock","text":"Visitor has arrived","size":"Large","weight":"Bolder","color":"Accent"},
+          {"type":"TextBlock","text":dateStr + " at " + arrived,"size":"Small","isSubtle":true,"spacing":"None"},
+          {"type":"FactSet","spacing":"Medium","facts":[
+            {"title":"Visitor","value":visitor.first + " " + visitor.last},
+            {"title":"Company","value":visitor.company || "-"},
+            {"title":"Purpose","value":visitor.purpose || "-"},
+            {"title":"Arrived","value":arrived},
+            {"title":"Visitor ID","value":visitor.id}
+          ]},
+          {"type":"TextBlock","text":"Please go to reception to meet your visitor.","wrap":true,"spacing":"Medium","color":"Good"}
+        ]
+      }
+    }]
   };
   fetch(webhookUrl, {
     method: 'POST',
@@ -1269,6 +1294,37 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('wh-url').value = '';
     document.getElementById('wh-emp-select').value = '';
     alert('Webhook ' + (url ? 'saved' : 'removed') + ' for ' + empName);
+  });
+
+  // Change admin PIN
+  document.getElementById('btn-change-pin').addEventListener('click', function() {
+    var current = document.getElementById('pin-current').value.trim();
+    var newPin  = document.getElementById('pin-new').value.trim();
+    var conf    = document.getElementById('pin-confirm').value.trim();
+    var msg     = document.getElementById('pin-change-msg');
+    function showMsg(text, ok) {
+      msg.style.display = 'block';
+      msg.style.background = ok ? 'var(--gl)' : 'var(--rl)';
+      msg.style.color = ok ? 'var(--gd)' : 'var(--rd)';
+      msg.textContent = text;
+      setTimeout(function() { msg.style.display = 'none'; }, 3000);
+    }
+    if (!current) { showMsg('Please enter your current PIN', false); return; }
+    if (current !== PIN) { showMsg('Incorrect current PIN', false); return; }
+    if (!newPin || newPin.length < 4) { showMsg('New PIN must be 4 digits', false); return; }
+    if (!/^[0-9]{4}$/.test(newPin)) { showMsg('PIN must contain numbers only', false); return; }
+    if (newPin !== conf) { showMsg('New PINs do not match', false); return; }
+    PIN = newPin;
+    localStorage.setItem('igt_admin_pin', PIN);
+    document.getElementById('pin-current').value = '';
+    document.getElementById('pin-new').value = '';
+    document.getElementById('pin-confirm').value = '';
+    showMsg('PIN changed successfully!', true);
+  });
+  ['pin-current','pin-new','pin-confirm'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', function() {
+      this.value = this.value.replace(/[^0-9]/g,'').slice(0,4);
+    });
   });
 
   // Field settings reset
