@@ -1,16 +1,37 @@
 services:
+
   vss-frontend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: vss-frontend
     restart: unless-stopped
-    # Loopback-only port for local diagnostics — Caddy does NOT use this
     ports:
       - "127.0.0.1:3006:3006"
+    depends_on:
+      - vss-api
     networks:
       - vss-network
       - adapt-web
+
+  vss-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vss-api
+    restart: unless-stopped
+    # No host port published — only reachable inside vss-network by nginx
+    environment:
+      - PORT=8080
+      - DB_PATH=/data/vss.db
+    volumes:
+      - vss-data:/data
+    networks:
+      - vss-network
+
+volumes:
+  vss-data:
+    name: vss-data
 
 networks:
   vss-network:

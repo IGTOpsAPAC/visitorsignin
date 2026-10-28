@@ -458,8 +458,33 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
             <li>Add Office 365 Outlook &#8594; Send an email (V2)</li>
             <li>To / Subject / Body: use outputs from Decode VSS event &#8594; email object</li>
             <li>Copy webhook URL from trigger &#8594; paste above</li>
+            <li>After <b>Send an email (V2)</b>, add <b>Microsoft Teams &#8594; Post message in a chat or channel</b></li>
+            <li>Post as: Flow bot &nbsp;|&nbsp; Select your Team and Channel</li>
+            <li>Message body: <code style="font-size:10px;background:var(--bg2);padding:2px 5px;border-radius:4px">outputs('Decode_VSS_event')?['teams']?['message']</code></li>
           </ol>
         </details>
+      </div>
+      <!-- Message templates -->
+      <div class="notify-section">
+        <div class="card-title">&#9998; Message templates</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Customise the email subject, email body, and Teams direct message. Use placeholders: <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{visitor_name}}</code> <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{host_name}}</code> <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{company}}</code> <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{purpose}}</code> <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{time}}</code> <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{date}}</code> <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px">{{visitor_id}}</code></p>
+        <div class="field">
+          <label>Email subject</label>
+          <input id="tmpl-email-subject" type="text" placeholder="VSS | Visitor Arrived - {{visitor_name}}"/>
+        </div>
+        <div class="field">
+          <label>Email body</label>
+          <textarea id="tmpl-email-body" style="width:100%;padding:13px 16px;border:1.5px solid var(--br2);border-radius:12px;background:var(--bg);color:var(--tx);font-size:13px;font-family:var(--font);resize:vertical;min-height:140px;line-height:1.6" placeholder="Email body text..."></textarea>
+        </div>
+        <div class="field">
+          <label>Teams direct message</label>
+          <textarea id="tmpl-teams-msg" style="width:100%;padding:13px 16px;border:1.5px solid var(--br2);border-radius:12px;background:var(--bg);color:var(--tx);font-size:13px;font-family:var(--font);resize:vertical;min-height:120px;line-height:1.6" placeholder="Teams message text..."></textarea>
+        </div>
+        <div id="tmpl-save-msg" style="font-size:13px;text-align:center;margin-bottom:8px;display:none;padding:8px;border-radius:8px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-full" id="btn-save-templates" style="margin-top:0;flex:1;padding:12px;font-size:14px">Save templates</button>
+          <button class="btn-sec" id="btn-reset-templates" style="margin-top:0;flex:1;padding:12px;font-size:14px">Reset defaults</button>
+        </div>
       </div>
       <!-- Teams -->
       <div class="notify-section">
@@ -557,15 +582,40 @@ if(_particles){for(var i=0;i<20;i++){var p=document.createElement('div');var sz=
 (function() {
 'use strict';
 
-/* ── Storage ───────────────────────────────────────────── */
-var VDB = 'igt_v4', EDB = 'igt_emp_v1', FDB = 'igt_fields_v1';
+/* ── API base ───────────────────────────────────────────── */
+var API = '/apps/vss/api';
 
-function loadV() { try { var d = localStorage.getItem(VDB); return d ? JSON.parse(d) : {visitors:[], nextId:1}; } catch(e) { return {visitors:[], nextId:1}; } }
-function saveV(db) { try { localStorage.setItem(VDB, JSON.stringify(db)); } catch(e) {} }
-function loadE() { try { var d = localStorage.getItem(EDB); return d ? JSON.parse(d) : []; } catch(e) { return []; } }
-function saveE(emps) { try { localStorage.setItem(EDB, JSON.stringify(emps)); } catch(e) {} }
+function apiGet(path) {
+  return fetch(API + path).then(function(r) { return r.json(); });
+}
+function apiPost(path, data) {
+  return fetch(API + path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(function(r) { return r.json(); });
+}
+function apiPatch(path, data) {
+  return fetch(API + path, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(function(r) { return r.json(); });
+}
+function apiPut(path, data) {
+  return fetch(API + path, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }).then(function(r) { return r.json(); });
+}
+function apiDelete(path) {
+  return fetch(API + path, { method:'DELETE' }).then(function(r) { return r.json(); });
+}
+
+/* ── Local-only storage (device-specific) ───────────────── */
+// PIN, biometric, field config, templates stay local
+var FDB = 'igt_fields_v1';
 function loadF() { try { var d = localStorage.getItem(FDB); return d ? JSON.parse(d) : null; } catch(e) { return null; } }
 function saveF(cfg) { try { localStorage.setItem(FDB, JSON.stringify(cfg)); } catch(e) {} }
+
+/* ── In-memory visitor cache (refreshed from API) ───────── */
+var db = { visitors: [], nextId: 1 };
+
+function refreshVisitors() {
+  return apiGet('/visitors').then(function(rows) {
+    db.visitors = rows || [];
+    return db.visitors;
+  }).catch(function() { return db.visitors; });
+}
 
 /* ── Field definitions ─────────────────────────────────── */
 var DEFAULT_FIELDS = [
@@ -578,8 +628,9 @@ var DEFAULT_FIELDS = [
   { id:'purpose',  label:'Purpose of visit',       type:'select', alwaysOn:false, mandatory:true  }
 ];
 
+var _fieldCache = null;
 function getFields() {
-  var saved = loadF();
+  var saved = _fieldCache || loadF();
   if (!saved) return DEFAULT_FIELDS.map(function(f) { return Object.assign({}, f); });
   // Merge saved settings onto defaults (handles new fields added in future)
   return DEFAULT_FIELDS.map(function(f) {
@@ -594,24 +645,7 @@ function fieldEnabled(f) {
   return f.enabled !== false; // default on unless explicitly disabled
 }
 
-var db = loadV();
-
-/* Seed sample visitors */
-if (db.visitors.length === 0) {
-  var td = new Date().toDateString();
-  var CP0 = [['#DDEEFF','#003A96'],['#E6F5E6','#1a6b1a'],['#FFF3E0','#9a5f00']];
-  [{first:'Jane',last:'Smith',company:'Acme Corp',host:'Alex Chen',purpose:'Meeting',arrived:'08:54',departed:null,status:'in'},
-   {first:'Rahul',last:'Gupta',company:'TechVen',host:'Sarah Park',purpose:'Client visit',arrived:'09:12',departed:null,status:'in'},
-   {first:'Nina',last:'Torres',company:'Zenith',host:'Priya Nair',purpose:'Client visit',arrived:'07:15',departed:'08:50',status:'out'}
-  ].forEach(function(s, i) {
-    s.id = 'VIS-' + String(db.nextId++).padStart(4,'0');
-    s.cbg = CP0[i][0]; s.cfg = CP0[i][1];
-    s.ini = (s.first[0] + s.last[0]).toUpperCase();
-    s.date = td;
-    db.visitors.push(s);
-  });
-  saveV(db);
-}
+/* Visitors loaded from API on demand */
 
 var CP = [['#DDEEFF','#003A96'],['#E6F5E6','#1a6b1a'],['#FFF3E0','#9a5f00'],['#F3E5F5','#6a1b9a'],['#E8F5E9','#2e7d32']];
 var cpIdx = 0;
@@ -767,7 +801,12 @@ function completeSignIn() {
     ini: ((vals.first[0]||'V') + (vals.last[0]||'V')).toUpperCase(),
     cbg: pair[0], cfg: pair[1]
   };
-  db.visitors.unshift(v); saveV(db);
+  // POST to API (async, don't block UI)
+  apiPost('/visitors', v).then(function(saved) {
+    if (saved && saved.id) v.id = saved.id;
+    db.visitors.unshift(v);
+  }).catch(function() { db.visitors.unshift(v); });
+  db.visitors.unshift(v);
   // Send Teams notification if webhook configured
   if (vals.hostWebhook) {
     sendTeamsNotification(vals.hostWebhook, v);
@@ -783,7 +822,7 @@ function completeSignIn() {
     var empE = empsE.find(function(e) { return e.name === vals.host || e.name.indexOf(vals.host) === 0; });
     if (empE) hostEmailAddr = empE.email || '';
   }
-  sendEmailNotification(v, hostEmailAddr);
+  sendEmailNotification(v, hostEmailAddr, vals.host);
   document.getElementById('si-sname').textContent = 'Welcome, ' + vals.first + '!';
   document.getElementById('si-smeta').textContent = 'Signed in to visit ' + vals.host;
   populateBadge(v);
@@ -997,7 +1036,8 @@ function soLookup() {
 
 function soConfirm() {
   if (!soV) return;
-  soV.status = 'out'; soV.departed = ts(); saveV(db);
+  soV.status = 'out'; soV.departed = ts();
+  apiPatch('/visitors/' + soV.id, { status:'out', departed:soV.departed }).catch(function(){});
   document.getElementById('so-sname').textContent = 'Goodbye, ' + soV.first + '!';
   document.getElementById('so-result').style.display = 'none';
   document.getElementById('so-success').style.display = 'block';
@@ -1015,10 +1055,75 @@ function soConfirm() {
 /* ── Admin PIN ─────────────────────────────────────────── */
 var pin = '';
 var PIN = localStorage.getItem('igt_admin_pin') || '1234';
-var BIOMETRIC_KEY = 'igt_biometric_enrolled';
-var EMAIL_WH_KEY  = 'vss_email_webhook';
-function loadEmailWH() { return localStorage.getItem(EMAIL_WH_KEY) || ''; }
-function saveEmailWH(url) { if (url) localStorage.setItem(EMAIL_WH_KEY, url); else localStorage.removeItem(EMAIL_WH_KEY); }
+var BIOMETRIC_KEY  = 'igt_biometric_enrolled';
+var TMPL_KEY       = 'vss_msg_templates';
+
+var DEFAULT_TEMPLATES = {
+  emailSubject: 'VSS | Visitor Arrived - {{visitor_name}}',
+  emailBody: [
+    'Hi {{host_name}},',
+    '',
+    'Your visitor {{visitor_name}} has arrived at IGT Erskine Park.',
+    '',
+    'Company:  {{company}}',
+    'Purpose:  {{purpose}}',
+    'Arrived:  {{time}} on {{date}}',
+    'Visitor ID: {{visitor_id}}',
+    '',
+    'Please proceed to reception to meet your visitor.',
+    '',
+    'IGT Erskine Park | Visitor Management System'
+  ].join('\n'),
+  teamsMsg: [
+    '\uD83D\uDC64 Hi {{host_name}}, your visitor has arrived!',
+    '',
+    '**{{visitor_name}}** from {{company}}',
+    'Purpose: {{purpose}}',
+    'Arrived: {{time}} on {{date}}',
+    'ID: {{visitor_id}}',
+    '',
+    'Please come to reception. \uD83D\uDC4B'
+  ].join('\n')
+};
+
+var _templatesCache = null;
+function loadTemplates() {
+  return _templatesCache || JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
+}
+function saveTemplates(t) {
+  _templatesCache = t;
+  apiPut('/settings/templates', { value: t }).catch(function(){});
+}
+function loadTemplatesFromServer() {
+  return apiGet('/settings').then(function(s) {
+    if (s && s.templates) { _templatesCache = s.templates; }
+    return loadTemplates();
+  }).catch(function() { return loadTemplates(); });
+}
+
+function applyTemplate(tmpl, visitor, hostName) {
+  var dateStr = new Date().toLocaleDateString('en-AU', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+  return tmpl
+    .replace(/{{visitor_name}}/g, visitor.first + ' ' + visitor.last)
+    .replace(/{{host_name}}/g, hostName || visitor.host || '')
+    .replace(/{{company}}/g, visitor.company || '\u2014')
+    .replace(/{{purpose}}/g, visitor.purpose || '\u2014')
+    .replace(/{{time}}/g, visitor.arrived || '')
+    .replace(/{{date}}/g, dateStr)
+    .replace(/{{visitor_id}}/g, visitor.id || '');
+}
+var _emailWhCache = null;
+function loadEmailWH() { return _emailWhCache || ''; }
+function saveEmailWH(url) {
+  _emailWhCache = url || '';
+  apiPut('/settings/emailWebhook', { value: _emailWhCache }).catch(function(){});
+}
+function loadEmailWHFromServer() {
+  return apiGet('/settings').then(function(s) {
+    if (s && s.emailWebhook !== undefined) _emailWhCache = s.emailWebhook;
+    return _emailWhCache || '';
+  }).catch(function() { return ''; });
+}
 
 /* ── WebAuthn / Biometric helpers ──────────────────────── */
 function isBiometricAvailable() {
@@ -1143,12 +1248,14 @@ function pinKey(k) {
 var logFilter = 'all';
 
 function renderAdmin() {
-  var td = new Date().toDateString();
-  document.getElementById('m-on').textContent  = db.visitors.filter(function(v) { return v.status === 'in'; }).length;
-  document.getElementById('m-td').textContent  = db.visitors.filter(function(v) { return v.date === td; }).length;
-  document.getElementById('m-out').textContent = db.visitors.filter(function(v) { return v.status === 'out' && v.date === td; }).length;
-  document.getElementById('m-all').textContent = db.visitors.length;
-  renderLog();
+  refreshVisitors().then(function() {
+    var td = new Date().toDateString();
+    document.getElementById('m-on').textContent  = db.visitors.filter(function(v) { return v.status === 'in'; }).length;
+    document.getElementById('m-td').textContent  = db.visitors.filter(function(v) { return v.date === td; }).length;
+    document.getElementById('m-out').textContent = db.visitors.filter(function(v) { return v.status === 'out' && v.date === td; }).length;
+    document.getElementById('m-all').textContent = db.visitors.length;
+    renderLog();
+  });
 }
 
 function switchAdminTab(name) {
@@ -1159,14 +1266,31 @@ function switchAdminTab(name) {
   if (btn) btn.classList.add('active');
   if (panel) panel.style.display = 'block';
   if (name === 'visitors') { renderAdmin(); }
-  if (name === 'notify') { renderWebhookList(); populateWebhookEmpSelect(); loadEmailWHInput(); }
+  if (name === 'notify') { renderWebhookList(); populateWebhookEmpSelect(); loadEmailWHInput(); renderTemplateEditor(); }
   if (name === 'fields') { renderFieldSettings(); renderEmpList(); }
   if (name === 'security') { updateBiometricAdminStatus(); }
 }
 
 function loadEmailWHInput() {
-  var el = document.getElementById('email-wh-url');
-  if (el) { var saved = loadEmailWH(); if (saved) el.value = saved; }
+  loadEmailWHFromServer().then(function(url) {
+    var el = document.getElementById('email-wh-url');
+    if (el && url) {
+      el.value = url;
+      var st = document.getElementById('email-wh-status');
+      if (st) { st.style.display='block'; st.style.color='var(--g)'; st.textContent='Webhook configured'; }
+    }
+  });
+}
+
+function renderTemplateEditor() {
+  loadTemplatesFromServer().then(function(t) {
+    var subj  = document.getElementById('tmpl-email-subject');
+    var body  = document.getElementById('tmpl-email-body');
+    var teams = document.getElementById('tmpl-teams-msg');
+    if (subj)  subj.value  = t.emailSubject;
+    if (body)  body.value  = t.emailBody;
+    if (teams) teams.value = t.teamsMsg;
+  });
 }
 
 function renderLog() {
@@ -1191,7 +1315,11 @@ function renderLog() {
     b.addEventListener('click', function() {
       var id = this.getAttribute('data-id');
       var v = db.visitors.find(function(x) { return x.id === id; });
-      if (v) { v.status = 'out'; v.departed = ts(); saveV(db); renderAdmin(); }
+      if (v) {
+      v.status = 'out'; v.departed = ts();
+      apiPatch('/visitors/' + id, { status:'out', departed:v.departed }).catch(function(){});
+      renderAdmin();
+    }
     });
   });
 }
@@ -1218,14 +1346,13 @@ function exportCSV() {
 function populateHostSelect() {
   var sel = document.getElementById('f-host');
   if (!sel) return;
-  var emps = loadE();
-  sel.innerHTML = '<option value="">Select host...</option>';
-  if (emps.length === 0) {
-    ['Alex Chen - Engineering','Sarah Park - HR','Marcus Webb - Finance','Priya Nair - Legal','Tom Ellison - CEO'].forEach(function(name) {
-      var o = document.createElement('option');
-      o.value = name; o.textContent = name; sel.appendChild(o);
-    });
-  } else {
+  sel.innerHTML = '<option value="">Loading employees...</option>';
+  apiGet('/employees').then(function(emps) {
+    sel.innerHTML = '<option value="">Select host...</option>';
+    if (!emps || emps.length === 0) {
+      sel.innerHTML += '<option disabled>No employees imported yet</option>';
+      return;
+    }
     emps.forEach(function(e) {
       var o = document.createElement('option');
       o.value = e.name;
@@ -1234,25 +1361,37 @@ function populateHostSelect() {
       o.textContent = e.name + (e.dept ? ' - ' + e.dept : '');
       sel.appendChild(o);
     });
-  }
+  }).catch(function() {
+    sel.innerHTML = '<option value="">Select host...</option>';
+  });
 }
 
 function renderEmpList() {
-  var emps = loadE();
   var list     = document.getElementById('emp-list');
   var status   = document.getElementById('emp-status');
   var clearBtn = document.getElementById('btn-clear-emp');
   if (!list) return;
-  if (emps.length === 0) { list.innerHTML = ''; clearBtn.style.display = 'none'; status.style.display = 'none'; return; }
-  status.style.display = 'block';
-  status.textContent = emps.length + ' employee' + (emps.length !== 1 ? 's' : '') + ' loaded';
-  clearBtn.style.display = '';
-  list.innerHTML = emps.slice(0, 60).map(function(e) {
-    var ini = (e.name||'?').split(' ').map(function(w) { return w[0]||''; }).slice(0,2).join('').toUpperCase();
-    return '<div class="emp-row"><div class="emp-av">' + ini + '</div>' +
-      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + esc(e.name) + '</div>' +
-      '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email||'') + (e.dept ? ' &middot; '+esc(e.dept) : '') + (e.webhook ? ' <span style="color:var(--g);font-weight:700">&#128172;</span>' : '') + '</div></div></div>';
-  }).join('') + (emps.length > 60 ? '<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and '+(emps.length-60)+' more</div>' : '');
+  status.style.display = 'block'; status.textContent = 'Loading...';
+  apiGet('/employees').then(function(emps) {
+    if (!emps || emps.length === 0) {
+      list.innerHTML = '<div class="empty">No employees imported yet</div>';
+      clearBtn.style.display = 'none';
+      status.style.display = 'none';
+      return;
+    }
+    status.style.display = 'block';
+    status.textContent = emps.length + ' employee' + (emps.length !== 1 ? 's' : '') + ' loaded on server';
+    clearBtn.style.display = '';
+    list.innerHTML = emps.slice(0, 60).map(function(e) {
+      var ini = (e.name||'?').split(' ').map(function(w){return w[0]||'';}).slice(0,2).join('').toUpperCase();
+      return '<div class="emp-row"><div class="emp-av">' + ini + '</div>' +
+        '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + esc(e.name) + '</div>' +
+        '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email||'') + (e.dept?' &middot; '+esc(e.dept):'') + (e.webhook?' <span style="color:var(--g);font-weight:700">&#128172;</span>':'') + '</div></div></div>';
+    }).join('') + (emps.length > 60 ? '<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and '+(emps.length-60)+' more</div>' : '');
+  }).catch(function() {
+    list.innerHTML = '<div class="empty">Could not load employees</div>';
+    status.style.display = 'none';
+  });
 }
 
 function parseCSV(text) {
@@ -1334,10 +1473,11 @@ function sendTeamsNotification(webhookUrl, visitor) {
 
 /* ── Webhook management UI ─────────────────────────────── */
 function renderWebhookList() {
-  var emps = loadE();
   var list = document.getElementById('webhook-list');
   if (!list) return;
-  var withWebhook = emps.filter(function(e) { return e.webhook; });
+  list.innerHTML = '<div style="font-size:13px;color:var(--tx3);padding:8px 0">Loading...</div>';
+  apiGet('/employees').then(function(emps) {
+  var withWebhook = (emps||[]).filter(function(e) { return e.webhook; });
   if (!withWebhook.length) {
     list.innerHTML = '<div style="font-size:13px;color:var(--tx3);padding:8px 0;text-align:center">No webhooks configured yet.<br/>Add one below or import via CSV.</div>';
     return;
@@ -1360,25 +1500,29 @@ function renderWebhookList() {
 
   list.querySelectorAll('.wh-del-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var name = this.getAttribute('data-name');
-      var emps2 = loadE();
-      var emp = emps2.find(function(e) { return e.name === name; });
-      if (emp) { emp.webhook = ''; saveE(emps2); renderWebhookList(); populateHostSelect(); }
+      var empId = this.getAttribute('data-id');
+      if (empId) {
+        apiPatch('/employees/' + empId, { webhook: '' }).then(function() {
+          renderWebhookList(); populateHostSelect();
+        });
+      }
     });
   });
 
   list.querySelectorAll('.wh-test-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var name = this.getAttribute('data-name');
-      var emps2 = loadE();
-      var emp = emps2.find(function(e) { return e.name === name; });
-      if (!emp || !emp.webhook) return;
-      sendTeamsNotification(emp.webhook, {
+      var wh   = this.getAttribute('data-wh');
+      if (!wh) return;
+      sendTeamsNotification(wh, {
         first: 'Test', last: 'Visitor', company: 'IGT Test',
         purpose: 'Test notification', arrived: '09:00', id: 'VIS-TEST'
       });
       alert('Test message sent to ' + name + ' - Teams channel!');
     });
+  });
+  }).catch(function() {
+    list.innerHTML = '<div class="empty">Could not load webhooks</div>';
   });
 }
 
@@ -1430,43 +1574,46 @@ function updateBiometricAdminStatus() {
 }
 
 /* ── Email notification via Power Automate (PRISM pattern) ── */
-function sendEmailNotification(visitor, hostEmail) {
+function sendEmailNotification(visitor, hostEmail, hostName) {
   var whUrl = loadEmailWH();
-  if (!whUrl) return; // not configured
-  if (!hostEmail) return; // no email address for host
+  if (!whUrl) return;
+  if (!hostEmail) return;
 
   var arrived = visitor.arrived || '';
   var dateStr = new Date().toLocaleDateString('en-AU', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
   var appUrl = window.location.origin + window.location.pathname;
+  var t = loadTemplates();
 
   // Build the email payload (PRISM standard contract)
+  var teamsMsg   = applyTemplate(t.teamsMsg, visitor, hostName);
+  var emailSubj  = applyTemplate(t.emailSubject, visitor, hostName);
+
   var emailPayload = {
     eventType: 'visitor.arrived',
     eventId: visitor.id + '-' + Date.now(),
     occurredAt: new Date().toISOString(),
+    teams: { message: teamsMsg },
+    teams: {
+      message: [
+        '&#128100; **Visitor has arrived at IGT Erskine Park**',
+        '',
+        '**Name:** ' + visitor.first + ' ' + visitor.last,
+        '**Company:** ' + (visitor.company || '\u2014'),
+        '**Host:** ' + (visitor.host || '\u2014'),
+        '**Purpose:** ' + (visitor.purpose || '\u2014'),
+        '**Arrived:** ' + arrived + ' \u2014 ' + dateStr,
+        '**Visitor ID:** ' + visitor.id
+      ].join('\n')
+    },
     email: {
       toLine: hostEmail,
-      subject: 'VSS | Visitor Arrived - ' + visitor.first + ' ' + visitor.last,
-      html: [
-        '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">',
-        '<div style="background:#0050C8;padding:20px 24px">',
-        '<h2 style="color:#fff;margin:0;font-size:20px">Erskine Park Visitor Management</h2>',
-        '</div>',
-        '<div style="padding:24px;background:#f4f6fb">',
-        '<h3 style="color:#0050C8;margin-top:0">&#128100; Your visitor has arrived</h3>',
-        '<table style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden">',
-        '<tr><td style="padding:12px 16px;border-bottom:1px solid #eee;font-weight:600;width:140px;color:#555">Visitor</td><td style="padding:12px 16px;border-bottom:1px solid #eee">' + visitor.first + ' ' + visitor.last + '</td></tr>',
-        '<tr><td style="padding:12px 16px;border-bottom:1px solid #eee;font-weight:600;color:#555">Company</td><td style="padding:12px 16px;border-bottom:1px solid #eee">' + (visitor.company || '—') + '</td></tr>',
-        '<tr><td style="padding:12px 16px;border-bottom:1px solid #eee;font-weight:600;color:#555">Purpose</td><td style="padding:12px 16px;border-bottom:1px solid #eee">' + (visitor.purpose || '—') + '</td></tr>',
-        '<tr><td style="padding:12px 16px;border-bottom:1px solid #eee;font-weight:600;color:#555">Arrived</td><td style="padding:12px 16px;border-bottom:1px solid #eee">' + arrived + ' — ' + dateStr + '</td></tr>',
-        '<tr><td style="padding:12px 16px;font-weight:600;color:#555">Visitor ID</td><td style="padding:12px 16px">' + visitor.id + '</td></tr>',
-        '</table>',
-        '<p style="margin:20px 0 0;color:#555;font-size:14px">Please proceed to reception to meet your visitor.</p>',
-        '</div>',
-        '<div style="padding:16px 24px;background:#e8ecf5;font-size:12px;color:#888">',
-        'Erskine Park Visitor Management System &nbsp;|&nbsp; APAC SC Operational Excellence',
+      subject: emailSubj,
+      html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">' +
+        '<div style="background:#4A1580;padding:16px 24px;border-radius:8px 8px 0 0">' +
+        '<h2 style="color:#fff;margin:0;font-size:18px">IGT Erskine Park Visitor Management</h2></div>' +
+        '<div style="background:#f8f5ff;padding:24px;border-radius:0 0 8px 8px;white-space:pre-line;font-size:14px;color:#0D0118;line-height:1.7">' +
+        applyTemplate(t.emailBody, visitor, hostName).replace(/\n/g,'<br/>') +
         '</div></div>'
-      ].join('')
     }
   };
 
@@ -1616,7 +1763,9 @@ function updateFieldConfig(id, prop, value) {
   f[prop] = value;
   // Save only non-default values
   var toSave = fields.map(function(x) { return {id:x.id, enabled:fieldEnabled(x), mandatory:x.mandatory}; });
+  _fieldCache = toSave;
   saveF(toSave);
+  apiPut('/settings/fields', { value: toSave }).catch(function(){});
   renderFieldSettings();
 }
 
@@ -1723,16 +1872,19 @@ document.addEventListener('DOMContentLoaded', function() {
     reader.onload = function(ev) {
       var emps = parseCSV(ev.target.result);
       if (!emps.length) { alert('No employees found. Check your CSV has Name and Email columns.'); return; }
-      saveE(emps); renderEmpList(); populateHostSelect();
-      alert(emps.length + ' employees imported!');
+      apiPost('/employees', emps).then(function(r) {
+        renderEmpList(); populateHostSelect();
+        alert(r.count + ' employees imported to server!');
+      }).catch(function() { alert('Import failed — check server connection'); });
     };
     reader.readAsText(file);
     e.target.value = '';
   });
   document.getElementById('btn-clear-emp').addEventListener('click', function() {
-    if (!confirm('Clear all employees and restore defaults?')) return;
-    localStorage.removeItem('igt_emp_v1');
-    renderEmpList(); populateHostSelect();
+    if (!confirm('Clear all employees from server?')) return;
+    apiDelete('/employees').then(function() {
+      renderEmpList(); populateHostSelect();
+    }).catch(function() { alert('Could not clear employees'); });
   });
 
   // Email webhook (Power Automate)
@@ -1773,13 +1925,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Teams webhook management
   document.getElementById('btn-save-webhook').addEventListener('click', function() {
-    var empName = document.getElementById('wh-emp-select').value;
-    var url     = (document.getElementById('wh-url').value || '').trim();
-    if (!empName) { alert('Please select an employee'); return; }
+    var empId = document.getElementById('wh-emp-select').value;
+    var url   = (document.getElementById('wh-url').value || '').trim();
+    if (!empId) { alert('Please select an employee'); return; }
     if (url && !url.startsWith('http')) { alert('Please enter a valid webhook URL starting with http'); return; }
-    var emps = loadE();
-    var emp = emps.find(function(e) { return e.name === empName; });
-    if (!emp) { alert('Employee not found. Please import employees first.'); return; }
+    var emp = { id: empId };
     emp.webhook = url;
     saveE(emps);
     renderWebhookList();
@@ -1835,10 +1985,36 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // Message templates
+  document.getElementById('btn-save-templates').addEventListener('click', function() {
+    var t = {
+      emailSubject: document.getElementById('tmpl-email-subject').value.trim() || DEFAULT_TEMPLATES.emailSubject,
+      emailBody:    document.getElementById('tmpl-email-body').value || DEFAULT_TEMPLATES.emailBody,
+      teamsMsg:     document.getElementById('tmpl-teams-msg').value || DEFAULT_TEMPLATES.teamsMsg
+    };
+    saveTemplates(t);
+    var msg = document.getElementById('tmpl-save-msg');
+    msg.style.display = 'block'; msg.style.background = 'var(--gl)'; msg.style.color = 'var(--gd)';
+    msg.textContent = '\u2713 Templates saved';
+    setTimeout(function() { msg.style.display = 'none'; }, 2500);
+  });
+  document.getElementById('btn-reset-templates').addEventListener('click', function() {
+    if (!confirm('Reset all message templates to defaults?')) return;
+    _templatesCache = null;
+    apiDelete('/settings/templates').catch(function(){});
+    renderTemplateEditor();
+    var msg = document.getElementById('tmpl-save-msg');
+    msg.style.display = 'block'; msg.style.background = 'var(--gl)'; msg.style.color = 'var(--gd)';
+    msg.textContent = '\u2713 Reset to defaults';
+    setTimeout(function() { msg.style.display = 'none'; }, 2500);
+  });
+
   // Field settings reset
   document.getElementById('btn-reset-fields').addEventListener('click', function() {
     if (!confirm('Reset all field settings to defaults?')) return;
     localStorage.removeItem('igt_fields_v1');
+    _fieldCache = null;
+    apiDelete('/settings/fields').catch(function(){});
     renderFieldSettings();
   });
 
@@ -1853,10 +2029,10 @@ document.addEventListener('DOMContentLoaded', function() {
     onsite.forEach(function(v) {
       v.status = 'out';
       v.departed = '18:00';
-      v.autoSignOff = true; // flag for log note
+      v.autoSignOff = true;
       signedOff.push(v.first + ' ' + v.last);
+      apiPatch('/visitors/' + v.id, { status:'out', departed:'18:00', autoSignOff:true }).catch(function(){});
     });
-    saveV(db);
     if (signedOff.length > 0) {
       console.log('Auto sign-off at 6pm:', signedOff.join(', '));
     }
@@ -1885,8 +2061,13 @@ document.addEventListener('DOMContentLoaded', function() {
   autoSignOff();
 
   // Init
-  buildSignInForm();
-  renderEmpList();
+  // Load server settings first, then build form
+  loadTemplatesFromServer().then(function() {
+    apiGet('/settings').then(function(s) {
+      if (s && s.fields) { _fieldCache = s.fields; }
+      buildSignInForm();
+    }).catch(function() { buildSignInForm(); });
+  });
   show('screen-home');
   document.getElementById('si-bar').style.display = 'none';
   updateBiometricUI();
