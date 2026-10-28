@@ -61,6 +61,14 @@ db.exec(`
   INSERT OR IGNORE INTO next_id (id, val) VALUES (1, 1);
 `);
 
+// ── Migrations (safe to run on every start) ──────────────
+const _empCols = db.prepare("PRAGMA table_info(employees)").all().map(c => c.name);
+if (!_empCols.includes('inactive')) {
+  db.exec('ALTER TABLE employees ADD COLUMN inactive INTEGER DEFAULT 0');
+  console.log('Migration: added inactive column');
+}
+// ─────────────────────────────────────────────────────────
+
 // ── Helper ────────────────────────────────────────────────
 function getNextId() {
   const row = db.prepare('SELECT val FROM next_id WHERE id = 1').get();
