@@ -45,6 +45,7 @@ db.exec(`
     email     TEXT,
     dept      TEXT,
     webhook   TEXT,
+    inactive  INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -134,8 +135,20 @@ function rowToVisitor(r) {
 // GET all employees
 app.get('/api/employees', (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM employees ORDER BY name').all();
-    res.json(rows.map(r => ({ id: r.id, name: r.name, email: r.email, dept: r.dept, webhook: r.webhook })));
+    const rows = db.prepare('SELECT * FROM employees ORDER BY inactive, name').all();
+    res.json(rows.map(r => ({ id: r.id, name: r.name, email: r.email, dept: r.dept, webhook: r.webhook, inactive: r.inactive === 1 })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST single employee (add one)
+app.post('/api/employees/single', (req, res) => {
+  try {
+    const { name, email, dept, webhook } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name required' });
+    const result = db.prepare(
+      'INSERT INTO employees (name, email, dept, webhook) VALUES (@name, @email, @dept, @webhook)'
+    ).run({ name, email: email||'', dept: dept||'', webhook: webhook||'' });
+    res.json({ id: result.lastInsertRowid, name, email, dept, webhook });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -154,11 +167,27 @@ app.post('/api/employees', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH single employee webhook
+// PATCH single employee (webhook, inactive, or full edit)
 app.patch('/api/employees/:id', (req, res) => {
   try {
-    const { webhook } = req.body;
-    db.prepare('UPDATE employees SET webhook = ? WHERE id = ?').run(webhook || '', req.params.id);
+    const fields = [];
+    const params = {};
+    if (req.body.webhook   !== undefined) { fields.push('webhook = @webhook');   params.webhook   = req.body.webhook   || ''; }
+    if (req.body.inactive  !== undefined) { fields.push('inactive = @inactive'); params.inactive  = req.body.inactive ? 1 : 0; }
+    if (req.body.name      !== undefined) { fields.push('name = @name');         params.name      = req.body.name; }
+    if (req.body.email     !== undefined) { fields.push('email = @email');       params.email     = req.body.email     || ''; }
+    if (req.body.dept      !== undefined) { fields.push('dept = @dept');         params.dept      = req.body.dept      || ''; }
+    if (!fields.length) return res.json({ ok: true });
+    params.id = req.params.id;
+    db.prepare('UPDATE employees SET ' + fields.join(', ') + ' WHERE id = @id').run(params);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE single employee
+app.delete('/api/employees/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM employees WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
