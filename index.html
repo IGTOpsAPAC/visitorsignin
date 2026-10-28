@@ -1118,24 +1118,40 @@ function loadMarquee() {
 function saveMarquee(lines) {
   apiPut('/settings/marquee', { value: lines }).catch(function(){});
   applyMarqueeToHome(lines);
+  // Also update _marqueeLines so re-render stays in sync
+  _marqueeLines = lines.slice();
 }
 
 function applyMarqueeToHome(lines) {
   var inner = document.getElementById('rot-inner');
+  var wrap  = document.getElementById('rot-wrap');
   if (!inner) return;
-  // Need at least 4 items for smooth loop (duplicate first)
-  var items = lines.slice();
-  if (items.length < 1) items = DEFAULT_MARQUEE.slice();
-  items.push(items[0]); // loop back
+  var items = (lines && lines.length) ? lines.slice() : DEFAULT_MARQUEE.slice();
+  // Duplicate first item at end for seamless loop
+  items.push(items[0]);
   var count = items.length;
-  // Update animation keyframes dynamically
-  var step = Math.floor(100 / count);
+  // Rebuild items
   inner.innerHTML = items.map(function(t) {
-    return '<div class="rot-item"><span>' + esc(t.toUpperCase()) + '</span></div>';
+    return '<div class="rot-item"><span>' + (t||'').toUpperCase() + '</span></div>';
   }).join('');
-  // Update animation duration proportionally
-  var dur = Math.max(3, count * 1.8);
-  inner.style.animationDuration = dur + 's';
+  // Recalculate animation: each item shows for ~2s, transition 0.5s
+  var dur = count * 2.5;
+  // Rebuild keyframes dynamically
+  var styleId = 'mq-style';
+  var existing = document.getElementById(styleId);
+  if (existing) existing.remove();
+  var pct = 100 / count;
+  var kf = '@keyframes rot {';
+  for (var i = 0; i < count; i++) {
+    var hold1 = (i * pct).toFixed(1);
+    var hold2 = ((i * pct) + pct * 0.7).toFixed(1);
+    kf += hold1 + '%,' + hold2 + '% { transform: translateY(-' + (i * 48) + 'px); }';
+  }
+  kf += '}';
+  var style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = kf + ' .rot-inner { animation-duration: ' + dur + 's !important; }';
+  document.head.appendChild(style);
 }
 
 function renderMarqueeEditor() {
@@ -1152,25 +1168,88 @@ var _marqueeLines = [];
 function renderMarqueeLines() {
   var list = document.getElementById('marquee-lines-list');
   if (!list) return;
+  var total = _marqueeLines.length;
   list.innerHTML = _marqueeLines.map(function(line, i) {
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
-      '<div style="color:var(--tx3);font-size:16px;cursor:grab;flex-shrink:0">&#8645;</div>' +
-      '<input type="text" value="' + esc(line) + '" data-idx="' + i + '" class="marquee-input" style="flex:1;padding:11px 14px;border:1.5px solid var(--br2);border-radius:10px;background:var(--bg);color:var(--tx);font-size:14px;font-family:var(--font)"/>' +
-      '<button class="marquee-del" data-idx="' + i + '" style="background:var(--rl);color:var(--rd);border:none;border-radius:8px;padding:8px 10px;cursor:pointer;font-size:14px;flex-shrink:0">&#128465;</button>' +
+    return '<div class="mq-row" draggable="true" data-idx="' + i + '" style="display:flex;align-items:center;gap:6px;margin-bottom:8px;background:var(--bg);border:1px solid var(--br);border-radius:10px;padding:6px 8px">' +
+      // Up/Down buttons
+      '<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">' +
+        '<button class="mq-up" data-idx="' + i + '" ' + (i===0?'disabled':'') + ' style="background:none;border:none;color:'+(i===0?'var(--br2)':'var(--pur)')+';font-size:14px;cursor:'+(i===0?'default':'pointer')+';padding:0 2px;line-height:1">&#9650;</button>' +
+        '<button class="mq-dn" data-idx="' + i + '" ' + (i===total-1?'disabled':'') + ' style="background:none;border:none;color:'+(i===total-1?'var(--br2)':'var(--pur)')+';font-size:14px;cursor:'+(i===total-1?'default':'pointer')+';padding:0 2px;line-height:1">&#9660;</button>' +
+      '</div>' +
+      // Drag handle
+      '<div class="mq-drag" style="color:var(--tx3);font-size:18px;cursor:grab;flex-shrink:0;padding:0 2px">&#9776;</div>' +
+      // Input
+      '<input type="text" value="' + esc(line) + '" data-idx="' + i + '" class="marquee-input" style="flex:1;padding:9px 12px;border:1.5px solid var(--br2);border-radius:8px;background:var(--bg);color:var(--tx);font-size:14px;font-family:var(--font)"/>' +
+      // Delete
+      '<button class="mq-del" data-idx="' + i + '" style="background:var(--rl);color:var(--rd);border:none;border-radius:7px;padding:7px 9px;cursor:pointer;font-size:13px;flex-shrink:0">&#128465;</button>' +
     '</div>';
   }).join('');
-  // Wire input changes
+
+  // Wire inputs
   list.querySelectorAll('.marquee-input').forEach(function(inp) {
     inp.addEventListener('input', function() {
       _marqueeLines[parseInt(this.getAttribute('data-idx'))] = this.value;
     });
   });
-  // Wire delete buttons
-  list.querySelectorAll('.marquee-del').forEach(function(btn) {
+
+  // Wire up buttons
+  list.querySelectorAll('.mq-up').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var idx = parseInt(this.getAttribute('data-idx'));
-      _marqueeLines.splice(idx, 1);
+      var i = parseInt(this.getAttribute('data-idx'));
+      if (i <= 0) return;
+      var tmp = _marqueeLines[i-1]; _marqueeLines[i-1] = _marqueeLines[i]; _marqueeLines[i] = tmp;
       renderMarqueeLines();
+    });
+  });
+
+  // Wire down buttons
+  list.querySelectorAll('.mq-dn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var i = parseInt(this.getAttribute('data-idx'));
+      if (i >= _marqueeLines.length - 1) return;
+      var tmp = _marqueeLines[i+1]; _marqueeLines[i+1] = _marqueeLines[i]; _marqueeLines[i] = tmp;
+      renderMarqueeLines();
+    });
+  });
+
+  // Wire delete
+  list.querySelectorAll('.mq-del').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var i = parseInt(this.getAttribute('data-idx'));
+      _marqueeLines.splice(i, 1);
+      renderMarqueeLines();
+    });
+  });
+
+  // Drag and drop reorder
+  var dragSrc = null;
+  list.querySelectorAll('.mq-row').forEach(function(row) {
+    row.addEventListener('dragstart', function(e) {
+      dragSrc = this;
+      this.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', function() {
+      this.style.opacity = '1';
+      list.querySelectorAll('.mq-row').forEach(function(r) { r.style.borderColor = ''; });
+    });
+    row.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.style.borderColor = 'var(--pur)';
+      return false;
+    });
+    row.addEventListener('dragleave', function() { this.style.borderColor = ''; });
+    row.addEventListener('drop', function(e) {
+      e.stopPropagation();
+      if (dragSrc !== this) {
+        var fromIdx = parseInt(dragSrc.getAttribute('data-idx'));
+        var toIdx   = parseInt(this.getAttribute('data-idx'));
+        var moved   = _marqueeLines.splice(fromIdx, 1)[0];
+        _marqueeLines.splice(toIdx, 0, moved);
+        renderMarqueeLines();
+      }
+      return false;
     });
   });
 }
@@ -1265,6 +1344,8 @@ function unlockAdmin() {
   document.getElementById('admin-pin').style.display = 'none';
   document.getElementById('admin-dash').style.display = 'flex';
   switchAdminTab('visitors');
+  // Pre-load employees in background so host dropdown is ready
+  populateHostSelect();
 }
 
 function showBiometricStatus(msg, ok) {
@@ -1589,31 +1670,8 @@ function showEmpMsg(text, ok) {
 }
 
 function renderEmpList() {
-  var list     = document.getElementById('emp-list');
-  var status   = document.getElementById('emp-status');
-  var clearBtn = document.getElementById('btn-clear-emp');
-  if (!list) return;
-  status.style.display = 'block'; status.textContent = 'Loading...';
-  apiGet('/employees').then(function(emps) {
-    if (!emps || emps.length === 0) {
-      list.innerHTML = '<div class="empty">No employees imported yet</div>';
-      clearBtn.style.display = 'none';
-      status.style.display = 'none';
-      return;
-    }
-    status.style.display = 'block';
-    status.textContent = emps.length + ' employee' + (emps.length !== 1 ? 's' : '') + ' loaded on server';
-    clearBtn.style.display = '';
-    list.innerHTML = emps.slice(0, 60).map(function(e) {
-      var ini = (e.name||'?').split(' ').map(function(w){return w[0]||'';}).slice(0,2).join('').toUpperCase();
-      return '<div class="emp-row"><div class="emp-av">' + ini + '</div>' +
-        '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + esc(e.name) + '</div>' +
-        '<div style="font-size:11px;color:var(--tx3)">' + esc(e.email||'') + (e.dept?' &middot; '+esc(e.dept):'') + (e.webhook?' <span style="color:var(--g);font-weight:700">&#128172;</span>':'') + '</div></div></div>';
-    }).join('') + (emps.length > 60 ? '<div style="font-size:12px;color:var(--tx3);padding:8px 0">...and '+(emps.length-60)+' more</div>' : '');
-  }).catch(function() {
-    list.innerHTML = '<div class="empty">Could not load employees</div>';
-    status.style.display = 'none';
-  });
+  // Alias — employees now managed in Employees tab
+  renderEmpFullList();
 }
 
 function parseCSV(text) {
@@ -2117,12 +2175,17 @@ document.addEventListener('DOMContentLoaded', function() {
     renderMarqueeLines();
   });
   document.getElementById('btn-save-marquee').addEventListener('click', function() {
-    var lines = _marqueeLines.filter(function(l){ return l.trim(); });
+    // Read latest input values before saving
+    document.querySelectorAll('.marquee-input').forEach(function(inp) {
+      var i = parseInt(inp.getAttribute('data-idx'));
+      if (!isNaN(i)) _marqueeLines[i] = inp.value;
+    });
+    var lines = _marqueeLines.filter(function(l){ return l && l.trim(); });
     if (!lines.length) { alert('At least one line required'); return; }
     saveMarquee(lines);
     var msg = document.getElementById('marquee-save-msg');
     msg.style.display='block'; msg.style.background='var(--gl)'; msg.style.color='var(--gd)';
-    msg.textContent='\u2713 Saved — home screen updated';
+    msg.textContent='\u2713 Saved — home screen updated!';
     setTimeout(function(){msg.style.display='none';},2500);
   });
   document.getElementById('btn-reset-marquee').addEventListener('click', function() {
