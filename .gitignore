@@ -1,0 +1,16 @@
+# Never commit these
+.env
+*.env.local
+*.env.production
+
+# Database dumps / exports — transfer via scp only
+*.sql
+*.dump
+*.bak
+*.csv.export
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp

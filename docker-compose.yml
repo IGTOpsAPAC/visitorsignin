@@ -1,0 +1,20 @@
+services:
+  vss-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vss-frontend
+    restart: unless-stopped
+    # Loopback-only port for local diagnostics — Caddy does NOT use this
+    ports:
+      - "127.0.0.1:3006:3006"
+    networks:
+      - vss-network
+      - adapt-web
+
+networks:
+  vss-network:
+    name: vss-network
+  adapt-web:
+    name: adapt-web
+    external: true

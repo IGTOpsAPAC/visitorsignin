@@ -1,0 +1,4 @@
+redir /apps/vss /apps/vss/ permanent
+handle /apps/vss/* {
+    reverse_proxy vss-frontend:3006
+}
