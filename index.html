@@ -339,7 +339,8 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
             <button class="btn-full" id="btn-copy-badge" style="margin-top:0;flex:1;background:rgba(123,47,190,0.15);color:var(--pur);border:1.5px solid var(--br2);box-shadow:none">&#128203; Copy</button>
           </div>
           <div id="copy-msg" style="font-size:13px;color:var(--g);text-align:center;margin-top:8px;display:none">&#10003; Badge details copied!</div>
-          <button class="btn-sec" id="si-done" style="margin-top:10px">Back to Home</button>
+          <div id="si-badge-countdown" style="font-size:13px;color:var(--tx3);margin-top:10px;text-align:center;display:none">Returning to home...</div>
+          <button class="btn-sec" id="si-done" style="margin-top:8px">Back to Home</button>
         </div>
       </div>
     </div>
@@ -811,8 +812,29 @@ function showSiStep(n) {
   if (n === 3) {
     showStep('si-s3');
     bar.style.display = 'none';
-    // Apply badge setting when success screen shows
-    loadBadgeSetting().then(function(enabled) { applyBadgeSetting(enabled); });
+    // Apply badge setting and auto-redirect if badge printing disabled
+    loadBadgeSetting().then(function(enabled) {
+      applyBadgeSetting(enabled);
+      if (!enabled) {
+        // No badge buttons — show countdown and auto-go home
+        var countdown = document.getElementById('si-badge-countdown');
+        var doneBtn   = document.getElementById('si-done');
+        if (countdown) countdown.style.display = 'block';
+        if (doneBtn)   doneBtn.style.display   = '';
+        var secs = 3;
+        var iv = setInterval(function() {
+          secs--;
+          if (countdown) countdown.textContent = 'Returning to home in ' + secs + ' second' + (secs !== 1 ? 's' : '') + '...';
+          if (secs <= 0) {
+            clearInterval(iv);
+            show('screen-home');
+          }
+        }, 1000);
+      } else {
+        var countdown2 = document.getElementById('si-badge-countdown');
+        if (countdown2) countdown2.style.display = 'none';
+      }
+    });
     return;
   }
   if (n === 2) {
