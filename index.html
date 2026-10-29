@@ -550,6 +550,17 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
     <div class="admin-tab-panel" id="apanel-fields" style="display:none">
       <!-- Form fields -->
       <div class="card">
+        <!-- Badge printing toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg2);border-radius:12px;margin-bottom:14px;border:1px solid var(--br)">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--tx)">&#128424; Badge printing</div>
+            <div style="font-size:12px;color:var(--tx3);margin-top:2px">Show Print and Copy buttons after sign-in</div>
+          </div>
+          <label class="tog">
+            <input type="checkbox" id="badge-print-toggle" checked/>
+            <span class="tog-sl"></span>
+          </label>
+        </div>
         <div class="card-title">&#9881; Sign-in form fields</div>
         <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Toggle fields on/off and mark as mandatory. Locked fields are always shown.</p>
         <div id="field-settings-list"></div>
@@ -800,6 +811,8 @@ function showSiStep(n) {
   if (n === 3) {
     showStep('si-s3');
     bar.style.display = 'none';
+    // Apply badge setting when success screen shows
+    loadBadgeSetting().then(function(enabled) { applyBadgeSetting(enabled); });
     return;
   }
   if (n === 2) {
@@ -1104,6 +1117,27 @@ function soConfirm() {
 var pin = '';
 var PIN = localStorage.getItem('igt_admin_pin') || '1234';
 var BIOMETRIC_KEY  = 'igt_biometric_enrolled';
+var BADGE_KEY      = 'vss_badge_enabled';
+
+function loadBadgeSetting() {
+  return apiGet('/settings').then(function(s) {
+    // Default true if not set
+    return (s && s.badgePrint !== undefined) ? s.badgePrint : true;
+  }).catch(function() { return true; });
+}
+
+function saveBadgeSetting(enabled) {
+  apiPut('/settings/badgePrint', { value: enabled }).catch(function(){});
+}
+
+function applyBadgeSetting(enabled) {
+  var printBtn = document.getElementById('btn-print-badge');
+  var copyBtn  = document.getElementById('btn-copy-badge');
+  var copyMsg  = document.getElementById('copy-msg');
+  if (printBtn) printBtn.style.display = enabled ? '' : 'none';
+  if (copyBtn)  copyBtn.style.display  = enabled ? '' : 'none';
+  if (copyMsg)  copyMsg.style.display  = 'none';
+}
 var MARQUEE_KEY    = 'vss_marquee';
 var DEFAULT_MARQUEE = ['SIGN IN HERE', 'ERSKINE PARK', 'WELCOME'];
 
@@ -1467,7 +1501,12 @@ function switchAdminTab(name) {
   if (name === 'visitors')  { renderAdmin(); }
   if (name === 'employees') { renderEmpFullList(); }
   if (name === 'notify')    { renderWebhookList(); populateWebhookEmpSelect(); loadEmailWHInput(); renderTemplateEditor(); }
-  if (name === 'fields')    { renderFieldSettings(); }
+  if (name === 'fields')    { renderFieldSettings();
+    loadBadgeSetting().then(function(enabled) {
+      var tog = document.getElementById('badge-print-toggle');
+      if (tog) tog.checked = enabled;
+    });
+  }
   if (name === 'marquee')   { renderMarqueeEditor(); }
   if (name === 'security')  { updateBiometricAdminStatus(); }
 }
@@ -2352,6 +2391,17 @@ document.addEventListener('DOMContentLoaded', function() {
     msg.style.display = 'block'; msg.style.background = 'var(--gl)'; msg.style.color = 'var(--gd)';
     msg.textContent = '\u2713 Reset to defaults';
     setTimeout(function() { msg.style.display = 'none'; }, 2500);
+  });
+
+  // Badge print toggle
+  loadBadgeSetting().then(function(enabled) {
+    var tog = document.getElementById('badge-print-toggle');
+    if (tog) tog.checked = enabled;
+    applyBadgeSetting(enabled);
+  });
+  document.getElementById('badge-print-toggle').addEventListener('change', function() {
+    saveBadgeSetting(this.checked);
+    applyBadgeSetting(this.checked);
   });
 
   // Field settings reset
