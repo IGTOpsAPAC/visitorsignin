@@ -883,21 +883,9 @@ function completeSignIn() {
   }).catch(function() { db.visitors.unshift(v); });
   db.visitors.unshift(v);
   // Send Teams notification if webhook configured
-  if (vals.hostWebhook) {
-    sendTeamsNotification(vals.hostWebhook, v);
-  } else {
-    var emps2 = loadE();
-    var emp2 = emps2.find(function(e) { return e.name === vals.host || e.name.indexOf(vals.host) === 0; });
-    if (emp2 && emp2.webhook) sendTeamsNotification(emp2.webhook, v);
-  }
-  // Send email notification via Power Automate (PRISM pattern)
-  var hostEmailAddr = vals.hostEmail;
-  if (!hostEmailAddr) {
-    var empsE = loadE();
-    var empE = empsE.find(function(e) { return e.name === vals.host || e.name.indexOf(vals.host) === 0; });
-    if (empE) hostEmailAddr = empE.email || '';
-  }
-  sendEmailNotification(v, hostEmailAddr, vals.host);
+  if (vals.hostWebhook) sendTeamsNotification(vals.hostWebhook, v);
+  // Send email notification via Power Automate
+  if (vals.hostEmail) sendEmailNotification(v, vals.hostEmail, vals.host);
   document.getElementById('si-sname').textContent = 'Welcome, ' + vals.first + '!';
   document.getElementById('si-smeta').textContent = 'Signed in to visit ' + vals.host;
   populateBadge(v);
@@ -1134,6 +1122,9 @@ var BIOMETRIC_KEY  = 'igt_biometric_enrolled';
 var BADGE_KEY      = 'vss_badge_enabled';
 
 var _badgeEnabled = true; // cached synchronously
+// Safety stub — loadE() was replaced by API calls
+function loadE() { console.warn('loadE() called — should use API'); return []; }
+function saveE() { console.warn('saveE() called — should use API'); }
 
 function loadBadgeSetting() {
   return apiGet('/settings').then(function(s) {
@@ -1191,7 +1182,7 @@ function applyMarqueeToHome(lines) {
   // Rebuild keyframes dynamically
   var styleId = 'mq-style';
   var existing = document.getElementById(styleId);
-  if (existing) existing.remove();
+  if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
   var pct = 100 / count;
   var kf = '@keyframes rot {';
   for (var i = 0; i < count; i++) {
@@ -2472,20 +2463,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Init
   // Load server settings first, then build form
-  loadTemplatesFromServer().then(function() {
-    apiGet('/settings').then(function(s) {
-      if (s && s.fields) { _fieldCache = s.fields; }
-      buildSignInForm();
+  try {
+    loadTemplatesFromServer().then(function() {
+      apiGet('/settings').then(function(s) {
+        if (s && s.fields) { _fieldCache = s.fields; }
+        buildSignInForm();
+      }).catch(function() { buildSignInForm(); });
     }).catch(function() { buildSignInForm(); });
-  });
+  } catch(e) { buildSignInForm(); }
   show('screen-home');
   document.getElementById('si-bar').style.display = 'none';
   updateBiometricUI();
   updateBiometricAdminStatus();
   // Load marquee from server
-  loadMarquee().then(function(lines) { applyMarqueeToHome(lines); });
+  loadMarquee().then(function(lines) {
+    try { applyMarqueeToHome(lines); } catch(e) { console.warn('Marquee error:', e); }
+  });
   // Pre-load badge setting so it's cached before any sign-in
-  loadBadgeSetting();
+  loadBadgeSetting().catch(function(){});
 });
 
 })();
