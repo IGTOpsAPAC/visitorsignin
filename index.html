@@ -812,29 +812,21 @@ function showSiStep(n) {
   if (n === 3) {
     showStep('si-s3');
     bar.style.display = 'none';
-    // Apply badge setting and auto-redirect if badge printing disabled
-    loadBadgeSetting().then(function(enabled) {
-      applyBadgeSetting(enabled);
-      if (!enabled) {
-        // No badge buttons — show countdown and auto-go home
-        var countdown = document.getElementById('si-badge-countdown');
-        var doneBtn   = document.getElementById('si-done');
-        if (countdown) countdown.style.display = 'block';
-        if (doneBtn)   doneBtn.style.display   = '';
-        var secs = 3;
-        var iv = setInterval(function() {
-          secs--;
-          if (countdown) countdown.textContent = 'Returning to home in ' + secs + ' second' + (secs !== 1 ? 's' : '') + '...';
-          if (secs <= 0) {
-            clearInterval(iv);
-            show('screen-home');
-          }
-        }, 1000);
-      } else {
-        var countdown2 = document.getElementById('si-badge-countdown');
-        if (countdown2) countdown2.style.display = 'none';
-      }
-    });
+    // Use cached badge setting synchronously
+    applyBadgeSetting(_badgeEnabled);
+    var countdown = document.getElementById('si-badge-countdown');
+    if (!_badgeEnabled) {
+      // Badge disabled — countdown and auto-go home
+      if (countdown) { countdown.style.display = 'block'; countdown.textContent = 'Returning to home in 3 seconds...'; }
+      var secs = 3;
+      var iv = setInterval(function() {
+        secs--;
+        if (countdown) countdown.textContent = 'Returning to home in ' + secs + ' second' + (secs !== 1 ? 's' : '') + '...';
+        if (secs <= 0) { clearInterval(iv); show('screen-home'); }
+      }, 1000);
+    } else {
+      if (countdown) countdown.style.display = 'none';
+    }
     return;
   }
   if (n === 2) {
@@ -1141,18 +1133,22 @@ var PIN = localStorage.getItem('igt_admin_pin') || '1234';
 var BIOMETRIC_KEY  = 'igt_biometric_enrolled';
 var BADGE_KEY      = 'vss_badge_enabled';
 
+var _badgeEnabled = true; // cached synchronously
+
 function loadBadgeSetting() {
   return apiGet('/settings').then(function(s) {
-    // Default true if not set
-    return (s && s.badgePrint !== undefined) ? s.badgePrint : true;
-  }).catch(function() { return true; });
+    _badgeEnabled = (s && s.badgePrint !== undefined) ? s.badgePrint : true;
+    return _badgeEnabled;
+  }).catch(function() { return _badgeEnabled; });
 }
 
 function saveBadgeSetting(enabled) {
+  _badgeEnabled = enabled;
   apiPut('/settings/badgePrint', { value: enabled }).catch(function(){});
 }
 
 function applyBadgeSetting(enabled) {
+  _badgeEnabled = enabled;
   var printBtn = document.getElementById('btn-print-badge');
   var copyBtn  = document.getElementById('btn-copy-badge');
   var copyMsg  = document.getElementById('copy-msg');
@@ -1524,10 +1520,8 @@ function switchAdminTab(name) {
   if (name === 'employees') { renderEmpFullList(); }
   if (name === 'notify')    { renderWebhookList(); populateWebhookEmpSelect(); loadEmailWHInput(); renderTemplateEditor(); }
   if (name === 'fields')    { renderFieldSettings();
-    loadBadgeSetting().then(function(enabled) {
-      var tog = document.getElementById('badge-print-toggle');
-      if (tog) tog.checked = enabled;
-    });
+    var tog = document.getElementById('badge-print-toggle');
+    if (tog) tog.checked = _badgeEnabled;
   }
   if (name === 'marquee')   { renderMarqueeEditor(); }
   if (name === 'security')  { updateBiometricAdminStatus(); }
@@ -2416,15 +2410,14 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Badge print toggle
-  loadBadgeSetting().then(function(enabled) {
-    var tog = document.getElementById('badge-print-toggle');
-    if (tog) tog.checked = enabled;
-    applyBadgeSetting(enabled);
-  });
-  document.getElementById('badge-print-toggle').addEventListener('change', function() {
-    saveBadgeSetting(this.checked);
-    applyBadgeSetting(this.checked);
-  });
+  var badgeTog = document.getElementById('badge-print-toggle');
+  if (badgeTog) {
+    badgeTog.checked = _badgeEnabled;
+    badgeTog.addEventListener('change', function() {
+      saveBadgeSetting(this.checked);
+      applyBadgeSetting(this.checked);
+    });
+  }
 
   // Field settings reset
   document.getElementById('btn-reset-fields').addEventListener('click', function() {
@@ -2491,6 +2484,8 @@ document.addEventListener('DOMContentLoaded', function() {
   updateBiometricAdminStatus();
   // Load marquee from server
   loadMarquee().then(function(lines) { applyMarqueeToHome(lines); });
+  // Pre-load badge setting so it's cached before any sign-in
+  loadBadgeSetting();
 });
 
 })();
