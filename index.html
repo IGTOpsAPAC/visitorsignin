@@ -222,6 +222,15 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
 .biometric-registered{background:var(--gl) !important;color:var(--gd) !important;border-color:var(--g) !important}
 .rv-result-row{cursor:pointer;transition:background 0.15s;border-radius:10px}
 .rv-result-row:active{background:var(--bg2)}
+@keyframes modal-in{
+  from{opacity:0;transform:scale(0.8) translateY(20px)}
+  to{opacity:1;transform:scale(1) translateY(0)}
+}
+@media(prefers-color-scheme:dark){
+  #confirm-modal > div{background:var(--dark3) !important;}
+  #modal-name{color:var(--tx) !important}
+  #modal-msg{color:var(--tx2) !important}
+}
 @media print{
   @page {
     size: 90mm 20mm;
@@ -629,6 +638,21 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
   </div>
 </div>
 
+<!-- Confirmation modal -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;padding:20px;background:rgba(13,1,24,0.75);backdrop-filter:blur(6px)">
+  <div style="background:#fff;border-radius:24px;padding:32px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.4);animation:modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1) both">
+    <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#4A1580,#7B2FBE);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;box-shadow:0 8px 24px rgba(123,47,190,0.4)">&#128075;</div>
+    <div style="font-size:11px;font-weight:700;color:#7B2FBE;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">IGT ERSKINE PARK</div>
+    <div id="modal-name" style="font-size:22px;font-weight:700;color:#0D0118;margin-bottom:12px;line-height:1.2"></div>
+    <div id="modal-msg" style="font-size:14px;color:#555;line-height:1.7;margin-bottom:24px"></div>
+    <div style="background:linear-gradient(135deg,#f0ebfa,#e8dff5);border-radius:12px;padding:12px 16px;margin-bottom:20px">
+      <div style="font-size:12px;color:#7B2FBE;font-weight:600">&#128205; Please wait at reception</div>
+      <div style="font-size:12px;color:#8a6aaa;margin-top:3px">Your host will be with you shortly</div>
+    </div>
+    <button id="modal-ok" style="width:100%;background:linear-gradient(135deg,#4A1580,#7B2FBE);color:#fff;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:600;cursor:pointer;font-family:'Inter',-apple-system,sans-serif;box-shadow:0 4px 20px rgba(123,47,190,0.4)">Got it, thank you!</button>
+  </div>
+</div>
+
 </div><!-- #app -->
 <script>
 (function(){
@@ -909,6 +933,8 @@ function completeSignIn() {
   document.getElementById('si-smeta').textContent = 'Signed in to visit ' + vals.host;
   populateBadge(v);
   showSiStep(3);
+  // Show confirmation modal
+  showConfirmModal(vals.first, vals.host);
 }
 
 function validateStep1() {
@@ -1581,6 +1607,31 @@ function importSettings(file) {
     }
   };
   reader.readAsText(file);
+}
+
+/* ── Confirmation modal ─────────────────────────────── */
+function showConfirmModal(visitorName, hostName) {
+  var modal   = document.getElementById('confirm-modal');
+  var nameEl  = document.getElementById('modal-name');
+  var msgEl   = document.getElementById('modal-msg');
+  if (!modal) return;
+  nameEl.textContent = 'Welcome, ' + visitorName + '!';
+  msgEl.textContent  = 'You have been successfully signed in to IGT Erskine Park. '
+    + 'Your host, ' + hostName + ', has been notified of your arrival '
+    + 'and will come to meet you at the lobby shortly. '
+    + 'In the meantime, please make yourself comfortable at reception.';
+  modal.style.display = 'flex';
+  // Auto-dismiss after 15 seconds
+  var autoClose = setTimeout(function() { closeConfirmModal(); }, 15000);
+  document.getElementById('modal-ok').onclick = function() {
+    clearTimeout(autoClose);
+    closeConfirmModal();
+  };
+}
+
+function closeConfirmModal() {
+  var modal = document.getElementById('confirm-modal');
+  if (modal) modal.style.display = 'none';
 }
 
 function switchAdminTab(name) {
