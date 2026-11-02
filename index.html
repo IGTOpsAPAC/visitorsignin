@@ -1406,6 +1406,9 @@ function saveEmailWH(url) {
 function loadEmailWHFromServer() {
   return apiGet('/settings').then(function(s) {
     if (s && s.emailWebhook !== undefined) _emailWhCache = s.emailWebhook;
+    if (s && s.badgePrint  !== undefined) _badgeEnabled  = s.badgePrint;
+    if (s && s.templates   !== undefined) _templatesCache = s.templates;
+    if (s && s.marquee     !== undefined) applyMarqueeToHome(s.marquee);
     return _emailWhCache || '';
   }).catch(function() { return ''; });
 }
@@ -2036,7 +2039,13 @@ function updateBiometricAdminStatus() {
 /* ── Email notification via Power Automate (PRISM pattern) ── */
 function sendEmailNotification(visitor, hostEmail, hostName) {
   var whUrl = loadEmailWH();
-  if (!whUrl) return;
+  if (!whUrl) {
+    // Cache empty — try loading from server then retry
+    loadEmailWHFromServer().then(function(url) {
+      if (url && hostEmail) sendEmailNotification(visitor, hostEmail, hostName);
+    });
+    return;
+  }
   if (!hostEmail) return;
 
   var arrived = visitor.arrived || '';
@@ -2053,18 +2062,6 @@ function sendEmailNotification(visitor, hostEmail, hostName) {
     eventId: visitor.id + '-' + Date.now(),
     occurredAt: new Date().toISOString(),
     teams: { message: teamsMsg },
-    teams: {
-      message: [
-        '&#128100; **Visitor has arrived at IGT Erskine Park**',
-        '',
-        '**Name:** ' + visitor.first + ' ' + visitor.last,
-        '**Company:** ' + (visitor.company || '\u2014'),
-        '**Host:** ' + (visitor.host || '\u2014'),
-        '**Purpose:** ' + (visitor.purpose || '\u2014'),
-        '**Arrived:** ' + arrived + ' \u2014 ' + dateStr,
-        '**Visitor ID:** ' + visitor.id
-      ].join('\n')
-    },
     email: {
       toLine: hostEmail,
       subject: emailSubj,
@@ -2605,13 +2602,20 @@ document.addEventListener('DOMContentLoaded', function() {
   autoSignOff();
 
   // Init
-  // Load server settings first, then build form
+  // Load ALL settings in one API call on init
   try {
-    loadTemplatesFromServer().then(function() {
-      apiGet('/settings').then(function(s) {
-        if (s && s.fields) { _fieldCache = s.fields; }
-        buildSignInForm();
-      }).catch(function() { buildSignInForm(); });
+    apiGet('/settings').then(function(s) {
+      if (s) {
+        if (s.emailWebhook !== undefined) _emailWhCache   = s.emailWebhook;
+        if (s.templates   !== undefined) _templatesCache = s.templates;
+        if (s.badgePrint  !== undefined) _badgeEnabled   = s.badgePrint;
+        if (s.fields      !== undefined) _fieldCache     = s.fields;
+        if (s.marquee     !== undefined) { try { applyMarqueeToHome(s.marquee); } catch(e) {} }
+      }
+      buildSignInForm();
+      // Update badge toggle if admin is open
+      var tog = document.getElementById('badge-print-toggle');
+      if (tog) tog.checked = _badgeEnabled;
     }).catch(function() { buildSignInForm(); });
   } catch(e) { buildSignInForm(); }
   show('screen-home');
