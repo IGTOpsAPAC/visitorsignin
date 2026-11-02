@@ -518,6 +518,17 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
           </ol>
         </details>
       </div>
+      <!-- Settings backup -->
+      <div class="notify-section">
+        <div class="card-title">&#128190; Backup &amp; restore settings</div>
+        <p style="font-size:13px;color:var(--tx3);margin-bottom:12px">Export your webhook URLs and message templates to a file. Import to restore after any data loss.</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn-full" id="btn-export-settings" style="margin-top:0;flex:1;padding:12px;font-size:14px">&#11015; Export settings</button>
+          <button class="btn-sec" id="btn-import-settings" style="margin-top:0;flex:1;padding:12px;font-size:14px">&#11014; Import settings</button>
+          <input type="file" id="settings-import-file" accept=".json" style="display:none"/>
+        </div>
+        <div id="settings-backup-msg" style="font-size:13px;text-align:center;margin-top:8px;display:none;padding:8px;border-radius:8px"></div>
+      </div>
       <!-- Message templates -->
       <div class="notify-section">
         <div class="card-title">&#9998; Message templates</div>
@@ -1508,6 +1519,70 @@ function renderAdmin() {
   });
 }
 
+/* ── Settings backup / restore ──────────────────────── */
+function exportSettings() {
+  apiGet('/settings').then(function(s) {
+    apiGet('/employees').then(function(emps) {
+      var backup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        settings: s,
+        webhooks: (emps||[]).map(function(e) { return { name:e.name, email:e.email, webhook:e.webhook }; }).filter(function(e){return e.webhook;})
+      };
+      var blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href = url;
+      a.download = 'vss-settings-' + new Date().toISOString().slice(0,10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      var msg = document.getElementById('settings-backup-msg');
+      if (msg) { msg.style.display='block'; msg.style.background='var(--gl)'; msg.style.color='var(--gd)'; msg.textContent='\u2713 Settings exported'; setTimeout(function(){msg.style.display='none';},2500); }
+    });
+  });
+}
+
+function importSettings(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var backup = JSON.parse(e.target.result);
+      if (!backup.settings) { alert('Invalid backup file'); return; }
+      var s = backup.settings;
+      var promises = [];
+      // Restore each setting
+      Object.keys(s).forEach(function(key) {
+        promises.push(apiPut('/settings/' + key, { value: s[key] }));
+      });
+      // Restore webhooks
+      if (backup.webhooks && backup.webhooks.length) {
+        backup.webhooks.forEach(function(w) {
+          promises.push(
+            apiGet('/employees').then(function(emps) {
+              var emp = (emps||[]).find(function(e) { return e.name === w.name || e.email === w.email; });
+              if (emp && w.webhook) return apiPatch('/employees/' + emp.id, { webhook: w.webhook });
+            })
+          );
+        });
+      }
+      Promise.all(promises).then(function() {
+        // Refresh caches
+        if (s.emailWebhook) { _emailWhCache = s.emailWebhook; }
+        if (s.templates)    { _templatesCache = s.templates; }
+        if (s.badgePrint !== undefined) { _badgeEnabled = s.badgePrint; }
+        var msg = document.getElementById('settings-backup-msg');
+        if (msg) { msg.style.display='block'; msg.style.background='var(--gl)'; msg.style.color='var(--gd)'; msg.textContent='\u2713 Settings restored — reloading...'; }
+        setTimeout(function() { switchAdminTab('notify'); }, 1500);
+      });
+    } catch(err) {
+      alert('Could not read backup file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 function switchAdminTab(name) {
   document.querySelectorAll('.admin-tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.querySelectorAll('.admin-tab-panel').forEach(function(p) { p.style.display = 'none'; });
@@ -2219,6 +2294,16 @@ document.addEventListener('DOMContentLoaded', function() {
       this.classList.add('active');
       renderEmpFullList();
     });
+  });
+
+  // Settings backup/restore
+  document.getElementById('btn-export-settings').addEventListener('click', exportSettings);
+  document.getElementById('btn-import-settings').addEventListener('click', function() {
+    document.getElementById('settings-import-file').click();
+  });
+  document.getElementById('settings-import-file').addEventListener('change', function(e) {
+    if (e.target.files && e.target.files[0]) importSettings(e.target.files[0]);
+    this.value = '';
   });
 
   // Marquee editor
